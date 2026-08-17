@@ -28,9 +28,10 @@ enum NavigationDestination: String, CaseIterable, Identifiable {
 struct ContentView: View {
     @Environment(SortingStore.self) private var store
     @State private var selectedDestination: NavigationDestination = .dashboard
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             // MARK: Sidebar
             sidebarContent
                 .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 240)
@@ -39,8 +40,37 @@ struct ContentView: View {
             NavigationStack {
                 detailContent
             }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if columnVisibility == .detailOnly {
+                    reopenSidebarBar
+                }
+            }
         }
         .navigationSplitViewStyle(.balanced)
+    }
+
+    // MARK: - Reopen Sidebar
+
+    private var reopenSidebarBar: some View {
+        HStack {
+            Button {
+                withAnimation(.snappy(duration: 0.25)) {
+                    columnVisibility = .all
+                }
+            } label: {
+                Image(systemName: "sidebar.leading")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color.orangoTextSecondary)
+                    .frame(width: 44, height: 44)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Buka sidebar")
+
+            Spacer()
+        }
+        .padding(.leading, 12)
+        .background(Color.orangoPageBackground)
     }
 
     // MARK: - Detail Content
@@ -66,28 +96,29 @@ struct ContentView: View {
     private var sidebarContent: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                Circle()
-                    .fill(Color.orangoBrandOrange)
-                    .frame(width: 10, height: 10)
-                Circle()
-                    .fill(Color.orangoBrandOrange)
-                    .frame(width: 10, height: 10)
-                Circle()
-                    .fill(Color.orangoBrandOrange)
-                    .frame(width: 10, height: 10)
-
                 Text("OranGo")
                     .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(Color.orangoTextPrimary)
 
                 Spacer()
 
-                Image(systemName: "rectangle.portrait.on.rectangle.portrait")
-                    .font(.system(size: 16))
-                    .foregroundStyle(Color.orangoTextSecondary)
+                Button {
+                    withAnimation(.snappy(duration: 0.25)) {
+                        columnVisibility = .detailOnly
+                    }
+                } label: {
+                    Image(systemName: "sidebar.leading")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.orangoTextSecondary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Tutup sidebar")
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 20)
+            .padding(.leading, 16)
+            .padding(.trailing, 4)
+            .padding(.vertical, 12)
 
             Divider()
                 .foregroundStyle(Color.orangoBorder)

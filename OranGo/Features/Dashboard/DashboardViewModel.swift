@@ -7,37 +7,60 @@
 
 import Foundation
 
-/// ViewModel that drives the Dashboard screen.
-/// TODO: Replace placeholder data with actual database / API fetches.
 @Observable
+@MainActor
 final class DashboardViewModel {
+    private let store: SortingStore
 
-    // MARK: - Published State
+    init(store: SortingStore) {
+        self.store = store
+    }
 
-    /// Summary data displayed at the top of the dashboard.
-    var summary: DashboardSummary = .sample
+    // MARK: - Data (from the store)
 
-    /// Grade-level sorting results for the donut chart & breakdown.
-    var gradeResults: [GradeResult] = GradeResult.sampleResults
+    var summary: DashboardSummary { store.summary }
+    var gradeResults: [GradeResult] { store.gradeResults }
+    var insights: [HarvestInsight] { store.insights }
+    var sortingEntries: [SortingDayEntry] { store.sortingEntries }
 
-    /// Harvest insight items.
-    var insights: [HarvestInsight] = HarvestInsight.sampleInsights
+    var availableMachines: [SortingMachine] { store.availableMachines }
+    var gradingStandards: [GradingStandard] { store.gradingStandards }
 
-    /// Daily sorting entries for the detail table.
-    var sortingEntries: [SortingDayEntry] = SortingDayEntry.sampleEntries
+    // MARK: - Screen State
 
-    /// Currently selected date for filtering.
     var selectedDate: Date = .now
 
-    /// Currently selected date range filter.
     var selectedDateFilter: DateFilter = .today
 
-    /// Indices of expanded sorting day rows.
     var expandedDayIDs: Set<UUID> = []
+
+    var selectedGrade: GradeType?
+
+    // MARK: - Derived Summary Values
+
+    private var selectedResult: GradeResult? {
+        guard let selectedGrade else { return nil }
+        return gradeResults.first { $0.gradeType == selectedGrade }
+    }
+
+    var displayedWeightKg: Double {
+        selectedResult?.weightKg ?? summary.totalWeightKg
+    }
+
+    var displayedCount: Int {
+        selectedResult?.count ?? summary.totalCount
+    }
+
+    var displayedGradeLabel: String {
+        selectedGrade?.displayName ?? "Semua Grade"
+    }
 
     // MARK: - Actions
 
-    /// Toggles the expanded/collapsed state of a sorting day row.
+    func selectGrade(_ grade: GradeType) {
+        selectedGrade = (selectedGrade == grade) ? nil : grade
+    }
+
     func toggleExpansion(for entry: SortingDayEntry) {
         if expandedDayIDs.contains(entry.id) {
             expandedDayIDs.remove(entry.id)
@@ -46,26 +69,20 @@ final class DashboardViewModel {
         }
     }
 
-    /// Returns whether a sorting day row is expanded.
     func isExpanded(_ entry: SortingDayEntry) -> Bool {
         expandedDayIDs.contains(entry.id)
     }
 
-    /// Triggers a data export action.
-    /// TODO: Implement actual export logic (CSV, PDF, etc.)
-    func exportData() {
-        print("Export triggered — implement export logic here")
+    func startBatch(machine: SortingMachine, standard: GradingStandard) -> String? {
+        let batch = store.startBatch(machine: machine, standard: standard)
+
+        if let today = store.sortingEntries.first(where: \.isToday) {
+            expandedDayIDs.insert(today.id)
+        }
+        return batch?.name
     }
 
-    /// Fetches dashboard data from the backend.
-    /// TODO: Implement actual data fetching.
+    // TODO: [DB] Panggil database di sini, lalu isi properti SortingStore.
     func fetchData() async {
-        // Placeholder — data is already set via sample values.
-        // Replace with:
-        // let data = try await APIService.shared.fetchDashboard(date: selectedDate, filter: selectedDateFilter)
-        // self.summary = data.summary
-        // self.gradeResults = data.gradeResults
-        // self.insights = data.insights
-        // self.sortingEntries = data.sortingEntries
     }
 }

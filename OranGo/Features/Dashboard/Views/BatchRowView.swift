@@ -7,62 +7,69 @@
 
 import SwiftUI
 
-/// A single batch row displayed inside an expanded sorting day entry.
 struct BatchRowView: View {
     let batch: BatchEntry
 
-    /// Callback when the "Detail" button is tapped.
-    /// TODO: Wire to navigation / detail sheet in the actual app.
-    var onDetailTapped: (() -> Void)? = nil
+    let date: Date
+
+    private var route: BatchDetailRoute {
+        BatchDetailRoute(batchID: batch.id, batchName: batch.name, date: date)
+    }
 
     var body: some View {
         HStack(spacing: 0) {
-            // Batch name
             Text(batch.name)
-                .font(.system(size: 14))
-                .foregroundStyle(Color.orangoTextPrimary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.leading, 32)
-
-            // Batch weight
-            Text("\(Int(batch.weightKg)) kg")
-                .font(.system(size: 14))
-                .foregroundStyle(Color.orangoTextPrimary)
+                .font(.subheadline)
+                .padding(.leading, SortingTableMetrics.nestedIndent)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            // Spacer for "Total Batch" column
+            Text(batch.isOngoing ? "Sedang proses sorting" : "\(Int(batch.weightKg ?? 0)) kg")
+                .font(.subheadline)
+                .foregroundStyle(batch.isOngoing ? Color.orangoTextSecondary : Color.orangoTextPrimary)
+                .padding(.leading, SortingTableMetrics.nestedIndent)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
             Color.clear
                 .frame(maxWidth: .infinity)
 
-            // Detail button
-            Button {
-                onDetailTapped?()
-            } label: {
-                Text("Detail")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .fill(Color.orangoBrandOrange)
-                    )
-            }
-            .buttonStyle(.plain)
+            detailButton
+                .frame(width: SortingTableMetrics.trailingColumnWidth, alignment: .trailing)
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 16)
-        .background(Color.orangoCardBackground)
+        .foregroundStyle(Color.orangoTextPrimary)
+        .padding(.vertical, 8)
+        .padding(.horizontal, SortingTableMetrics.rowHorizontalPadding)
+        .frame(minHeight: 48)
+    }
+
+    private var detailButton: some View {
+        NavigationLink(value: route) {
+            Text("Detail")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 8)
+                .frame(minHeight: 32)
+                .background(Capsule().fill(Color.orangoBrandOrange))
+                .contentShape(.capsule)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Lihat detail \(batch.name)")
     }
 }
 
 // MARK: - Preview
 
 #Preview {
-    VStack(spacing: 0) {
-        BatchRowView(batch: BatchEntry(name: "Batch 1", weightKg: 330))
-        Divider()
-        BatchRowView(batch: BatchEntry(name: "Batch 2", weightKg: 350))
+    NavigationStack {
+        VStack(spacing: 0) {
+            BatchRowView(batch: BatchEntry(name: "Batch 1", weightKg: 330), date: .now)
+            BatchRowView(batch: BatchEntry(name: "Batch 2", weightKg: 350), date: .now)
+            BatchRowView(
+                batch: BatchEntry(name: "Batch 3", weightKg: nil, status: .ongoing),
+                date: .now
+            )
+        }
+        .padding()
+        .background(Color.orangoCardBackground)
     }
-    .padding()
 }

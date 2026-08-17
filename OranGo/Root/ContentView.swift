@@ -9,14 +9,12 @@ import SwiftUI
 
 // MARK: - Navigation Destination
 
-/// The available navigation destinations in the sidebar.
 enum NavigationDestination: String, CaseIterable, Identifiable {
     case dashboard = "Dashboard"
     case standardGrading = "Standar Grading"
 
     var id: String { rawValue }
 
-    /// SF Symbol icon for the sidebar item.
     var iconName: String {
         switch self {
         case .dashboard: return "chart.bar.fill"
@@ -27,8 +25,8 @@ enum NavigationDestination: String, CaseIterable, Identifiable {
 
 // MARK: - Content View
 
-/// Root view with a sidebar navigation and detail content area.
 struct ContentView: View {
+    @Environment(SortingStore.self) private var store
     @State private var selectedDestination: NavigationDestination = .dashboard
 
     var body: some View {
@@ -38,19 +36,28 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 240)
         } detail: {
             // MARK: Detail
-            switch selectedDestination {
-            case .dashboard:
-                DashboardView()
-            case .standardGrading:
-                // TODO: Replace with StandardGradingView when implemented.
-                Text("Standar Grading")
-                    .font(.title2)
-                    .foregroundStyle(Color.orangoTextSecondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.orangoPageBackground)
+            NavigationStack {
+                detailContent
             }
         }
         .navigationSplitViewStyle(.balanced)
+    }
+
+    // MARK: - Detail Content
+
+    @ViewBuilder
+    private var detailContent: some View {
+        switch selectedDestination {
+        case .dashboard:
+            DashboardView(store: store)
+        case .standardGrading:
+            Text("Standar Grading")
+                .font(.title2)
+                .foregroundStyle(Color.orangoTextSecondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.orangoPageBackground)
+                .toolbar(.hidden, for: .navigationBar)
+        }
     }
 
     // MARK: - Sidebar Content
@@ -58,10 +65,7 @@ struct ContentView: View {
     @ViewBuilder
     private var sidebarContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Logo header
             HStack(spacing: 8) {
-                // Logo placeholder
-                // TODO: Replace with actual OranGo logo asset.
                 Circle()
                     .fill(Color.orangoBrandOrange)
                     .frame(width: 10, height: 10)
@@ -88,7 +92,6 @@ struct ContentView: View {
             Divider()
                 .foregroundStyle(Color.orangoBorder)
 
-            // Navigation items
             VStack(spacing: 4) {
                 ForEach(NavigationDestination.allCases) { destination in
                     SidebarNavItem(
@@ -113,7 +116,6 @@ struct ContentView: View {
 
 // MARK: - Sidebar Navigation Item
 
-/// A single clickable navigation item in the sidebar.
 private struct SidebarNavItem: View {
     let destination: NavigationDestination
     let isSelected: Bool

@@ -8,97 +8,193 @@
 import SwiftUI
 
 // MARK: - Brand Colors
-// TODO: Replace approximate colors with exact hex values from the design system.
 
 extension Color {
-
     // MARK: Primary Brand
 
-    /// Primary orange used for accents, buttons, active states.
-    static let orangoBrandOrange = Color(red: 0.90, green: 0.45, blue: 0.10)
+    static let orangoBrandOrange = Color.orangoOrange
 
-    /// Dark navy used for sidebar background and text headings.
     static let orangoNavy = Color(red: 0.15, green: 0.18, blue: 0.28)
 
     // MARK: Status
 
-    /// Green badge color for "Aktif" status.
-    static let orangoStatusGreen = Color(red: 0.20, green: 0.72, blue: 0.40)
+    static let orangoStatusGreen = Color(red: 0.36, green: 0.75, blue: 0.29)
 
-    // MARK: Grade Segment Colors (Donut chart)
+    // MARK: Grade Palette
 
-    static let gradeAColor = Color(red: 0.95, green: 0.90, blue: 0.75)   // Cream / light tan
-    static let gradeBColor = Color(red: 0.45, green: 0.60, blue: 0.85)   // Blue
-    static let gradeCColor = Color(red: 0.95, green: 0.75, blue: 0.20)   // Yellow / gold
-    static let edibleColor = Color(red: 0.85, green: 0.85, blue: 0.80)   // Light grey-green
-    static let rejectColor = Color(red: 0.90, green: 0.30, blue: 0.25)   // Red
+    static let orangoGradeBlue = Color(red: 0.16, green: 0.42, blue: 0.85)
+
+    static let orangoGradeYellow = Color(red: 0.95, green: 0.77, blue: 0.07)
+
+    static let orangoGradeAmber = Color(red: 0.94, green: 0.66, blue: 0.20)
+
+    static let orangoGradeRed = Color(red: 0.90, green: 0.20, blue: 0.16)
+
+    static let orangoDangerRed = Color(red: 0.80, green: 0.25, blue: 0.25)
+
+    static let orangoGradeInk = Color(red: 0.10, green: 0.10, blue: 0.12)
 
     // MARK: Backgrounds
 
-    /// Light grey page background.
-    static let orangoPageBackground = Color(red: 0.95, green: 0.95, blue: 0.96)
+    static let orangoPageBackground = Color(red: 0.94, green: 0.94, blue: 0.95)
 
-    /// White card background.
     static let orangoCardBackground = Color.white
 
-    /// Sidebar background.
     static let orangoSidebarBackground = Color.white
+
+    static let orangoRowBackground = Color(red: 0.96, green: 0.96, blue: 0.97)
+
+    static let orangoRowHighlight = Color(red: 0.99, green: 0.94, blue: 0.88)
 
     // MARK: Text
 
-    /// Primary text color.
     static let orangoTextPrimary = Color(red: 0.15, green: 0.15, blue: 0.20)
 
-    /// Secondary / muted text.
     static let orangoTextSecondary = Color(red: 0.50, green: 0.50, blue: 0.55)
 
-    /// Tertiary / hint text.
     static let orangoTextTertiary = Color(red: 0.70, green: 0.70, blue: 0.72)
 
     // MARK: Borders & Dividers
 
-    /// Light border color for cards and table rows.
     static let orangoBorder = Color(red: 0.90, green: 0.90, blue: 0.91)
-
-    // MARK: Insight Rank Colors
-
-    /// Ranked insight badge colors (green, blue/teal, orange).
-    static let insightRank1 = Color(red: 0.20, green: 0.72, blue: 0.40)
-    static let insightRank2 = Color(red: 0.25, green: 0.55, blue: 0.82)
-    static let insightRank3 = Color(red: 0.93, green: 0.58, blue: 0.15)
 }
 
-// MARK: - GradeType Color Mapping
+// MARK: - Grade Appearance
+
+struct GradeAppearance {
+    let fill: Color
+    let patternColor: Color?
+    let ink: Color
+    let border: Color?
+    var inkOutline: Color? = nil
+}
 
 extension GradeType {
-    /// The color used for this grade in charts and badges.
-    var color: Color {
+    var patternAssetName: String? {
         switch self {
-        case .gradeA: return .gradeAColor
-        case .gradeB: return .gradeBColor
-        case .gradeC: return .gradeCColor
-        case .edible: return .edibleColor
-        case .reject: return .rejectColor
+        case .gradeA: return "pattern-polkadot"
+        case .gradeB: return "pattern-angled-lines"
+        case .gradeC: return "pattern-squares-plaid"
+        case .edible: return "pattern-horizontal-lines"
+        case .reject: return nil
         }
     }
+
+    var chartAppearance: GradeAppearance {
+        switch self {
+        case .gradeA:
+            return GradeAppearance(fill: .white, patternColor: .orangoGradeInk,
+                                   ink: .white, border: nil,
+                                   inkOutline: .orangoGradeInk)
+        case .gradeB:
+            return GradeAppearance(fill: .orangoGradeBlue, patternColor: .white,
+                                   ink: .white, border: nil,
+                                   inkOutline: .orangoGradeBlue)
+        case .gradeC:
+            return GradeAppearance(fill: .orangoGradeYellow, patternColor: nil,
+                                   ink: .white, border: nil,
+                                   inkOutline: .orangoGradeYellow)
+        case .edible:
+            return GradeAppearance(fill: .orangoGradeAmber, patternColor: .white,
+                                   ink: .white, border: nil)
+        case .reject:
+            return GradeAppearance(fill: .orangoGradeRed, patternColor: nil,
+                                   ink: .white, border: nil)
+        }
+    }
+
+    var chartGlyphScale: CGFloat {
+        switch self {
+        case .reject: return 0.8
+        default: return 1
+        }
+    }
+
+    var selectionTint: Color {
+        switch self {
+        case .gradeA: return .orangoRowBackground
+        default: return chartAppearance.fill.opacity(0.12)
+        }
+    }
+
+    var badgeAppearance: GradeAppearance {
+        switch self {
+        case .gradeA:
+            return GradeAppearance(fill: .white, patternColor: .orangoGradeInk,
+                                   ink: .white, border: .orangoGradeInk,
+                                   inkOutline: .orangoGradeInk)
+        case .gradeB:
+            return GradeAppearance(fill: .orangoGradeBlue, patternColor: .white,
+                                   ink: .white, border: nil,
+                                   inkOutline: .orangoGradeBlue)
+        case .gradeC:
+            return GradeAppearance(fill: .orangoGradeYellow, patternColor: nil,
+                                   ink: .white, border: nil,
+                                   inkOutline: .orangoGradeYellow)
+        case .edible:
+            return GradeAppearance(fill: .white, patternColor: .orangoGradeAmber,
+                                   ink: .white, border: .orangoGradeAmber,
+                                   inkOutline: .orangoGradeAmber)
+        case .reject:
+            return GradeAppearance(fill: .orangoGradeRed, patternColor: nil,
+                                   ink: .white, border: nil)
+        }
+    }
+}
+
+// MARK: - Number Formatting
+
+extension Double {
+    var formattedWeight: String {
+        Self.weightFormatter.string(from: NSNumber(value: self)) ?? "\(self)"
+    }
+
+    private static let weightFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.locale = Locale(identifier: "id_ID")
+        formatter.minimumFractionDigits = 1
+        formatter.maximumFractionDigits = 1
+        return formatter
+    }()
+}
+
+extension Int {
+    var formattedCount: String {
+        Self.countFormatter.string(from: NSNumber(value: self)) ?? "\(self)"
+    }
+
+    private static let countFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.locale = Locale(identifier: "id_ID")
+        formatter.maximumFractionDigits = 0
+        return formatter
+    }()
 }
 
 // MARK: - Date Formatting
 
 extension Date {
-    /// Formats the date as "17 Agustus 2026" using Indonesian locale.
     var formattedIndonesian: String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "id_ID")
-        formatter.dateFormat = "d MMMM yyyy"
-        return formatter.string(from: self)
+        Self.indonesianFormatter.string(from: self)
     }
 
-    /// Formats the date as "2 Aug, 2026".
-    var formattedShort: String {
+    private static let indonesianFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US")
-        formatter.dateFormat = "d MMM, yyyy"
-        return formatter.string(from: self)
+        formatter.locale = Locale(identifier: "id_ID")
+        formatter.setLocalizedDateFormatFromTemplate("d MMMM yyyy")
+        return formatter
+    }()
+}
+
+// MARK: - Collection Helpers
+
+extension Array {
+    func chunked(into size: Int) -> [[Element]] {
+        guard size > 0 else { return [self] }
+        return stride(from: 0, to: count, by: size).map {
+            Array(self[$0 ..< Swift.min($0 + size, count)])
+        }
     }
 }

@@ -7,31 +7,44 @@
 
 import SwiftUI
 
-/// Section card combining the donut chart with grade breakdown items.
 struct GradeResultsCardView: View {
     let results: [GradeResult]
 
+    var selectedGrade: GradeType? = nil
+
+    var onSelect: ((GradeType) -> Void)? = nil
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Section title
             Text("Hasil sorting berdasarkan grade")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.headline)
                 .foregroundStyle(Color.orangoTextPrimary)
 
-            // Content: chart + breakdown
-            HStack(alignment: .center, spacing: 24) {
-                // Donut chart
-                DonutChartView(results: results)
-                    .frame(width: 180, height: 180)
-                
-                Spacer()
-                // Grade breakdown items
-                HStack(spacing: 60) {
-                    ForEach(results) { result in
-                        GradeItemView(result: result)
+            HStack(alignment: .center, spacing: 0) {
+                DonutChartView(
+                    results: results,
+                    selectedGrade: selectedGrade,
+                    onSelect: onSelect
+                )
+                .frame(width: 180, height: 180)
+                .padding(.trailing, 24)
+
+                ForEach(Array(results.enumerated()), id: \.element.id) { index, result in
+                    if index > 0 {
+                        Divider()
+                            .frame(height: 120)
+                            .overlay(Color.orangoBorder)
                     }
+
+                    GradeItemView(
+                        result: result,
+                        isSelected: selectedGrade == result.gradeType,
+                        isDimmed: isDimmed(result.gradeType),
+                        onTap: { onSelect?(result.gradeType) }
+                    )
                 }
             }
+            .frame(maxWidth: .infinity)
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -42,12 +55,20 @@ struct GradeResultsCardView: View {
                 .stroke(Color.orangoBorder, lineWidth: 1)
         )
     }
+
+    private func isDimmed(_ grade: GradeType) -> Bool {
+        guard let selectedGrade else { return false }
+        return grade != selectedGrade
+    }
 }
 
 // MARK: - Preview
 
 #Preview {
-    GradeResultsCardView(results: GradeResult.sampleResults)
-        .padding()
-        .background(Color.orangoPageBackground)
+    VStack(spacing: 20) {
+        GradeResultsCardView(results: GradeResult.sampleResults)
+        GradeResultsCardView(results: GradeResult.sampleResults, selectedGrade: .gradeB)
+    }
+    .padding()
+    .background(Color.orangoPageBackground)
 }

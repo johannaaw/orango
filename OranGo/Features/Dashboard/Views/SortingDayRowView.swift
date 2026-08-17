@@ -7,96 +7,121 @@
 
 import SwiftUI
 
-/// An expandable row showing a day's sorting summary.
-/// When expanded, displays the individual batch sub-rows.
 struct SortingDayRowView: View {
     let entry: SortingDayEntry
     let isExpanded: Bool
     let onToggle: () -> Void
 
+    var onAddBatch: (() -> Void)? = nil
+
+    private var textColor: Color {
+        entry.isToday ? Color.orangoBrandOrange : Color.orangoTextPrimary
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            // Main summary row
-            Button(action: onToggle) {
-                HStack(spacing: 0) {
-                    // Date
-                    Text(entry.date.formattedIndonesian)
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Color.orangoTextPrimary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+            summaryRow
 
-                    // Total sorting weight
-                    Text("\(Int(entry.totalWeightKg)) kg")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Color.orangoTextPrimary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    // Total batch count
-                    Text("\(entry.totalBatch)")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Color.orangoTextPrimary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    // Chevron
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Color.orangoTextSecondary)
-                }
-                .padding(.vertical, 14)
-                .padding(.horizontal, 16)
-                .background(
-                    isExpanded
-                        ? Color.orangoBrandOrange.opacity(0.06)
-                        : Color.orangoCardBackground
-                )
-            }
-            .buttonStyle(.plain)
-
-            // Expanded batch rows
-            if isExpanded && !entry.batches.isEmpty {
-                Divider()
-                    .foregroundStyle(Color.orangoBorder)
-
+            if isExpanded {
                 ForEach(entry.batches) { batch in
-                    BatchRowView(batch: batch) {
-                        // TODO: Navigate to batch detail screen
-                        print("Detail tapped for \(batch.name)")
-                    }
+                    BatchRowView(batch: batch, date: entry.date)
+                }
 
-                    if batch.id != entry.batches.last?.id {
-                        Divider()
-                            .padding(.leading, 32)
-                    }
+                if entry.isToday, let onAddBatch {
+                    addBatchButton(action: onAddBatch)
                 }
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(
-                    isExpanded ? Color.orangoBrandOrange.opacity(0.3) : Color.orangoBorder,
-                    lineWidth: 1
-                )
-        )
+    }
+
+    // MARK: - Summary Row
+
+    private var summaryRow: some View {
+        Button(action: onToggle) {
+            HStack(spacing: 0) {
+                Text(entry.date.formattedIndonesian)
+                    .font(.subheadline.weight(entry.isToday ? .semibold : .medium))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text("\(Int(entry.totalWeightKg)) kg")
+                    .font(.subheadline)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text("\(entry.totalBatch)")
+                    .font(.subheadline)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Image(systemName: "chevron.down")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.orangoTextSecondary)
+                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                    .frame(width: SortingTableMetrics.trailingColumnWidth, alignment: .trailing)
+            }
+            .foregroundStyle(textColor)
+            .padding(.vertical, 12)
+            .padding(.horizontal, SortingTableMetrics.rowHorizontalPadding)
+            .frame(minHeight: 44)
+            .background(
+                RoundedRectangle(cornerRadius: SortingTableMetrics.rowCornerRadius)
+                    .fill(isExpanded ? Color.orangoRowHighlight : Color.orangoRowBackground)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: SortingTableMetrics.rowCornerRadius))
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(entry.isToday
+            ? "Hari ini, \(entry.date.formattedIndonesian)"
+            : entry.date.formattedIndonesian)
+        .accessibilityValue("\(Int(entry.totalWeightKg)) kilogram, \(entry.totalBatch) batch")
+        .accessibilityHint(isExpanded ? "Ketuk untuk menutup daftar batch" : "Ketuk untuk melihat daftar batch")
+        .accessibilityAddTraits(isExpanded ? [.isButton, .isSelected] : .isButton)
+    }
+
+    // MARK: - Add Batch
+
+    private func addBatchButton(action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: "plus")
+                    .font(.footnote.weight(.semibold))
+
+                Text("Tambah batch baru")
+                    .font(.subheadline.weight(.medium))
+            }
+            .foregroundStyle(Color.orangoBrandOrange)
+            .frame(maxWidth: .infinity)
+            .frame(height: 44)
+            .background(
+                RoundedRectangle(cornerRadius: SortingTableMetrics.rowCornerRadius)
+                    .stroke(Color.orangoBrandOrange, lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: SortingTableMetrics.rowCornerRadius))
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 6)
+        .accessibilityLabel("Tambah batch baru")
     }
 }
 
 // MARK: - Preview
 
 #Preview {
-    VStack(spacing: 12) {
-        SortingDayRowView(
-            entry: SortingDayEntry.sampleEntries[0],
-            isExpanded: true,
-            onToggle: {}
-        )
+    NavigationStack {
+        VStack(spacing: 8) {
+            SortingDayRowView(
+                entry: SortingDayEntry.sampleEntries[0],
+                isExpanded: true,
+                onToggle: {},
+                onAddBatch: {}
+            )
 
-        SortingDayRowView(
-            entry: SortingDayEntry.sampleEntries[2],
-            isExpanded: false,
-            onToggle: {}
-        )
+            SortingDayRowView(
+                entry: SortingDayEntry.sampleEntries[2],
+                isExpanded: false,
+                onToggle: {}
+            )
+        }
+        .padding()
+        .background(Color.orangoCardBackground)
     }
-    .padding()
-    .background(Color.orangoPageBackground)
 }

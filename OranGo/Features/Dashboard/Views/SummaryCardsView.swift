@@ -2,119 +2,172 @@
 //  SummaryCardsView.swift
 //  OranGo
 //
-//  Three summary cards: Total Berat, Total Jumlah, Standar Grading.
+//  Summary cards: Total Berat, Total Jumlah, Total Batch, Standar Grading.
 //
 
 import SwiftUI
 
-/// Horizontal row of three summary metric cards.
 struct SummaryCardsView: View {
-    let summary: DashboardSummary
+    let weightKg: Double
+
+    let count: Int
+
+    let gradeLabel: String
+
+    let gradingStandard: String
+
+    var totalBatch: Int? = nil
+
+    var placeholder: String? = nil
+
+    var onGradingStandardInfo: (() -> Void)? = nil
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Total Berat
+        HStack(alignment: .top, spacing: 12) {
             SummaryCardItem(
                 title: "Total Berat",
-                subtitle: "Semua Grade",
-                value: String(format: "%.1f", summary.totalWeightKg)
-                    .replacingOccurrences(of: ".", with: ","),
+                subtitle: gradeLabel,
+                value: weightKg.formattedWeight,
                 unit: "kg",
-                accentColor: .orangoBrandOrange
+                placeholder: placeholder
             )
 
-            // Total Jumlah
             SummaryCardItem(
                 title: "Total Jumlah",
-                subtitle: "Semua Grade",
-                value: formatNumber(summary.totalCount),
+                subtitle: gradeLabel,
+                value: count.formattedCount,
                 unit: "buah",
-                accentColor: .orangoBrandOrange
+                placeholder: placeholder
             )
 
-            // Standar Grading
+            if let totalBatch {
+                SummaryCardItem(
+                    title: "Total Batch",
+                    subtitle: "Semua batch hari ini",
+                    value: "\(totalBatch)",
+                    unit: "batch"
+                )
+            }
+
             SummaryCardItem(
                 title: "Standar Grading",
                 subtitle: "Standar grading yang digunakan",
-                value: summary.gradingStandard,
+                value: gradingStandard,
                 unit: nil,
-                accentColor: .orangoBrandOrange,
-                isTextValue: true
+                placeholder: placeholder,
+                isTextValue: true,
+                onInfoTapped: onGradingStandardInfo
             )
+            .frame(minWidth: 240)
         }
-    }
-
-    /// Formats an integer with dot separators (e.g., 1245 → "1.245").
-    private func formatNumber(_ value: Int) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.groupingSeparator = "."
-        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
 
 // MARK: - Single Summary Card
 
-/// A single summary metric card.
 private struct SummaryCardItem: View {
     let title: String
     let subtitle: String
     let value: String
     let unit: String?
-    let accentColor: Color
+    var placeholder: String? = nil
     var isTextValue: Bool = false
+    var onInfoTapped: (() -> Void)? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Title
+        VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Color.orangoTextPrimary)
 
-            // Subtitle
             Text(subtitle)
-                .font(.system(size: 12))
+                .font(.caption)
                 .foregroundStyle(Color.orangoTextSecondary)
-                .lineLimit(1)
+                .fixedSize(horizontal: false, vertical: true)
 
-            Spacer(minLength: 4)
+            Spacer(minLength: 12)
 
-            // Value + unit
-            if isTextValue {
-                Text(value)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.orangoTextPrimary)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.8)
-            } else {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(value)
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(Color.orangoTextPrimary)
-
-                    if let unit {
-                        Text(unit)
-                            .font(.system(size: 14))
-                            .foregroundStyle(Color.orangoTextSecondary)
-                    }
-                }
-            }
+            valueRow
         }
         .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 108, alignment: .leading)
         .background(Color.orangoCardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.orangoBorder, lineWidth: 1)
         )
+        .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private var valueRow: some View {
+        if let placeholder {
+            Text(placeholder)
+                .font(.caption)
+                .foregroundStyle(Color.orangoTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        } else if isTextValue {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(value)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.orangoTextPrimary)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
+
+                Spacer(minLength: 0)
+
+                if let onInfoTapped {
+                    Button(action: onInfoTapped) {
+                        Image(systemName: "info.circle")
+                            .font(.footnote)
+                            .foregroundStyle(Color.orangoTextTertiary)
+                            .frame(width: 24, height: 24)
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Tentang standar grading")
+                }
+            }
+        } else {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(value)
+                    .font(.title.weight(.bold))
+                    .foregroundStyle(Color.orangoTextPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .contentTransition(.numericText())
+
+                if let unit {
+                    Text(unit)
+                        .font(.subheadline)
+                        .foregroundStyle(Color.orangoTextSecondary)
+                }
+            }
+        }
     }
 }
 
 // MARK: - Preview
 
 #Preview {
-    SummaryCardsView(summary: .sample)
-        .padding()
-        .background(Color.orangoPageBackground)
+    VStack(spacing: 12) {
+        SummaryCardsView(
+            weightKg: DashboardSummary.sample.totalWeightKg,
+            count: DashboardSummary.sample.totalCount,
+            gradeLabel: "Semua Grade",
+            gradingStandard: DashboardSummary.sample.gradingStandard,
+            totalBatch: DashboardSummary.sample.totalBatch
+        )
+
+        SummaryCardsView(
+            weightKg: 96.4,
+            count: 245,
+            gradeLabel: "Grade B",
+            gradingStandard: DashboardSummary.sample.gradingStandard
+        )
+    }
+    .padding()
+    .background(Color.orangoPageBackground)
 }

@@ -7,106 +7,156 @@
 
 import SwiftUI
 
-/// A donut chart that visualizes grade distribution as colored arc segments.
-/// TODO: Add patterned fills (dots, lines, crosshatch) to match the Figma design.
 struct DonutChartView: View {
     let results: [GradeResult]
 
-    /// Thickness of the donut ring.
-    private let lineWidth: CGFloat = 40
+    var selectedGrade: GradeType? = nil
+
+    var onSelect: ((GradeType) -> Void)? = nil
+
+    private let ringRatio: CGFloat = 0.26
 
     var body: some View {
         GeometryReader { geometry in
             let size = min(geometry.size.width, geometry.size.height)
+            let lineWidth = size * ringRatio
 
             ZStack {
-                // Draw arc segments
-                ForEach(Array(segmentData.enumerated()), id: \.offset) { index, segment in
-                    DonutSegment(
+                if segmentData.isEmpty {
+                    Circle()
+                        .strokeBorder(Color.orangoRowBackground, lineWidth: lineWidth)
+                        .frame(width: size, height: size)
+                }
+
+                ForEach(Array(segmentData.enumerated()), id: \.offset) { _, segment in
+                    let arc = DonutSegment(
                         startAngle: segment.startAngle,
                         endAngle: segment.endAngle,
                         lineWidth: lineWidth
                     )
-                    .fill(segment.color)
 
-                    // Segment label (A, B, C, etc.)
-                    segmentLabel(
-                        for: segment,
-                        in: size
+                    GradePatternFill(
+                        appearance: segment.appearance,
+                        patternAssetName: segment.patternAssetName,
+                        patternScale: size
                     )
+                    .frame(width: size, height: size)
+                    .compositingGroup()
+                    .mask {
+                        arc.frame(width: size, height: size)
+                    }
+                    .grayscale(isDimmed(segment.gradeType) ? 1 : 0)
+                    .opacity(isDimmed(segment.gradeType) ? 0.7 : 1)
+                    .contentShape(arc)
+                    .onTapGesture { onSelect?(segment.gradeType) }
+                }
+
+                ForEach(Array(segmentData.enumerated()), id: \.offset) { _, segment in
+                    segmentLabel(for: segment, in: size, lineWidth: lineWidth)
+                        .grayscale(isDimmed(segment.gradeType) ? 1 : 0)
+                        .opacity(isDimmed(segment.gradeType) ? 0.7 : 1)
+                        .allowsHitTesting(false)
                 }
             }
             .frame(width: size, height: size)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Distribusi hasil sorting berdasarkan grade")
+        .accessibilityValue(segmentData.isEmpty ? "Belum ada hasil sorting" : accessibilitySummary)
     }
 
     // MARK: - Segment Data
 
-        private struct SegmentInfo {
-            let startAngle: Angle
-            let endAngle: Angle
-            let midAngle: Angle
-            let color: Color
-            let label: String
-            let isSymbol: Bool // ✅ Tambahkan properti ini
+    private struct SegmentInfo {
+        let gradeType: GradeType
+        let startAngle: Angle
+        let endAngle: Angle
+        let midAngle: Angle
+        let appearance: GradeAppearance
+        let patternAssetName: String?
+        let label: String
+        let isSymbol: Bool
+    }
+
+    private func outlinedHaloRadius(_ segment: SegmentInfo) -> CGFloat {
+        segment.appearance.inkOutline == nil ? 2 : 0
+    }
+
+    private func isDimmed(_ grade: GradeType) -> Bool {
+        guard let selectedGrade else { return false }
+        return grade != selectedGrade
+    }
+
+    private var segmentData: [SegmentInfo] {
+        let total = results.reduce(0) { $0 + $1.weightKg }
+        guard total > 0 else { return [] }
+
+        var segments: [SegmentInfo] = []
+        var currentAngle: Double = -90
+
+        for result in results {
+            let fraction = result.weightKg / total
+            let sweepDegrees = fraction * 360
+
+            segments.append(SegmentInfo(
+                gradeType: result.gradeType,
+                startAngle: .degrees(currentAngle),
+                endAngle: .degrees(currentAngle + sweepDegrees),
+                midAngle: .degrees(currentAngle + sweepDegrees / 2),
+                appearance: result.gradeType.chartAppearance,
+                patternAssetName: result.gradeType.patternAssetName,
+                label: result.gradeType.chartLabel,
+                isSymbol: result.gradeType.isSymbol
+            ))
+
+            currentAngle += sweepDegrees
         }
 
-        private var segmentData: [SegmentInfo] {
-            let total = results.reduce(0) { $0 + $1.weightKg }
-            guard total > 0 else { return [] }
+        return segments
+    }
 
-            var segments: [SegmentInfo] = []
-            var currentAngle: Double = -90 // Start from top
+    private var accessibilitySummary: String {
+        results
+            .map { "\($0.gradeType.displayName) \($0.percentage.formattedWeight) persen" }
+            .joined(separator: ", ")
+    }
 
-            for result in results {
-                let fraction = result.weightKg / total
-                let sweepDegrees = fraction * 360
-                let startAngle = Angle.degrees(currentAngle)
-                let endAngle = Angle.degrees(currentAngle + sweepDegrees)
-                let midAngle = Angle.degrees(currentAngle + sweepDegrees / 2)
+    // MARK: - Label Positioning
 
-                segments.append(SegmentInfo(
-                    startAngle: startAngle,
-                    endAngle: endAngle,
-                    midAngle: midAngle,
-                    color: result.gradeType.color,
-                    label: result.gradeType.chartLabel,
-                    isSymbol: result.gradeType.isSymbol // ✅ Panggil dari Enum
-                ))
+    @ViewBuilder
+    private func segmentLabel(for segment: SegmentInfo, in size: CGFloat, lineWidth: CGFloat) -> some View {
+        let radius = (size / 2) - (lineWidth / 2)
+        let x = radius * cos(segment.midAngle.radians)
+        let y = radius * sin(segment.midAngle.radians)
+        let glyphSize = lineWidth * 0.46 * segment.gradeType.chartGlyphScale
 
-                currentAngle += sweepDegrees
-            }
-
-            return segments
-        }
-
-        // MARK: - Label Positioning
-
-        @ViewBuilder
-        private func segmentLabel(for segment: SegmentInfo, in size: CGFloat) -> some View {
-            let radius = (size / 2) - (lineWidth / 2)
-            let x = radius * cos(segment.midAngle.radians)
-            let y = radius * sin(segment.midAngle.radians)
-
-            // ✅ Gunakan isSymbol untuk menentukan cara render
+        Group {
             if segment.isSymbol {
                 Image(systemName: segment.label)
-                    .font(.system(size: 16, weight: .bold)) // Ukuran bisa disesuaikan
-                    .foregroundStyle(.white)
-                    .offset(x: x, y: y)
+                    .font(.system(size: glyphSize, weight: .bold))
+                    .foregroundStyle(segment.appearance.ink)
+                    .shadow(color: segment.appearance.fill, radius: 2)
+                    .shadow(color: segment.appearance.fill, radius: 2)
             } else {
-                Text(segment.label)
-                    .font(.system(size: 20, weight: .black)) 
-                    .foregroundStyle(.white)
-                    .offset(x: x, y: y)
+                OutlinedGlyph(
+                    string: segment.label,
+                    size: glyphSize,
+                    weight: .black,
+                    fill: segment.appearance.ink,
+                    outline: segment.appearance.inkOutline,
+                    outlineWidth: glyphSize * 0.06
+                )
+                .shadow(color: segment.appearance.fill, radius: outlinedHaloRadius(segment))
+                .shadow(color: segment.appearance.fill, radius: outlinedHaloRadius(segment))
             }
         }
+        .offset(x: x, y: y)
+    }
 }
 
 // MARK: - Donut Segment Shape
 
-/// A single arc segment of the donut chart.
 private struct DonutSegment: Shape {
     let startAngle: Angle
     let endAngle: Angle

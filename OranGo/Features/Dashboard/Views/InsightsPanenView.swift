@@ -7,21 +7,26 @@
 
 import SwiftUI
 
-/// Section card displaying ranked harvest insights.
 struct InsightsPanenView: View {
     let insights: [HarvestInsight]
 
+    var placeholder: String? = nil
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Section title
             Text("Insight panen")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.headline)
                 .foregroundStyle(Color.orangoTextPrimary)
 
-            // Insight items
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(insights) { insight in
-                    InsightItemRow(insight: insight)
+            if let placeholder {
+                Text(placeholder)
+                    .font(.caption)
+                    .foregroundStyle(Color.orangoTextSecondary)
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(insights) { insight in
+                        InsightItemRow(insight: insight)
+                    }
                 }
             }
         }
@@ -38,37 +43,24 @@ struct InsightsPanenView: View {
 
 // MARK: - Single Insight Row
 
-/// A single numbered insight item.
 private struct InsightItemRow: View {
     let insight: HarvestInsight
 
-    /// Color for the rank badge based on rank number.
-    private var rankColor: Color {
-        switch insight.rank {
-        case 1: return .insightRank1
-        case 2: return .insightRank2
-        case 3: return .insightRank3
-        default: return .orangoTextSecondary
-        }
-    }
-
     var body: some View {
         HStack(spacing: 12) {
-            // Rank badge
             Text("\(insight.rank)")
-                .font(.system(size: 13, weight: .bold))
+                .font(.footnote.weight(.bold))
                 .foregroundStyle(.white)
-                .frame(width: 28, height: 28)
-                .background(
-                    Circle()
-                        .fill(rankColor)
-                )
+                .frame(width: 26, height: 26)
+                .background(Circle().fill(Color.orangoDarkOrange))
 
-            // Description text
             Text(insight.description)
-                .font(.system(size: 14))
+                .font(.subheadline)
                 .foregroundStyle(Color.orangoTextPrimary)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Insight \(insight.rank): \(insight.description)")
     }
 }
 

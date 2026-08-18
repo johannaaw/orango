@@ -4,7 +4,6 @@
 //
 //  Created by Davin P on 06/08/26.
 //
-
 import SwiftUI
 
 // MARK: - Navigation Destination
@@ -79,4 +78,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
+        .previewInterfaceOrientation(.landscapeLeft)
 }

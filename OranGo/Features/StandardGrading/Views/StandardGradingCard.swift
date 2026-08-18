@@ -9,7 +9,6 @@ import SwiftUI
 struct StandardGradingItem: Identifiable {
     let id: Int
     let retailName: String
-    let fruitName: String
     let isActive: Bool
     let gradeName: String
     let diameterMin: Double?
@@ -55,7 +54,7 @@ struct StandardGradingCard: View {
             .frame(width: 48, height: 48)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text("\(item.retailName) - \(item.fruitName)")
+                Text("\(item.retailName)")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.primary)
             }
@@ -226,7 +225,6 @@ struct StandardGradingCard: View {
                 item: StandardGradingItem(
                     id: 1,
                     retailName: "Superindo",
-                    fruitName: "Jeruk medan",
                     isActive: true,
                     gradeName: "Grade A",
                     diameterMin: 6,
@@ -248,7 +246,6 @@ struct StandardGradingCard: View {
                 item: StandardGradingItem(
                     id: 2,
                     retailName: "Ranch Market",
-                    fruitName: "Jeruk medan",
                     isActive: false,
                     gradeName: "Grade B",
                     diameterMin: 6,

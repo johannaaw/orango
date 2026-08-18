@@ -128,9 +128,8 @@ struct StandardGradingView: View {
         return StandardGradingItem(
             id: rule.id,
             retailName: retail?.retailName ?? "Retail #\(rule.retailGradeId)",
-            fruitName: "Jeruk medan",
             isActive: retail?.aktif ?? false,
-            gradeName: viewModel.gradeNameById[rule.gradeId] ?? "Grade #\(rule.gradeId)",
+            gradeName: "Grade",
             diameterMin: rule.diameterMin,
             diameterMax: rule.diameterMaks,
             weightMin: rule.beratMin,
@@ -166,7 +165,7 @@ struct StandardGradingView: View {
             return
         }
 
-        guard !retail.aktif else {
+        guard !(retail.aktif ?? false) else {
             return
         }
 

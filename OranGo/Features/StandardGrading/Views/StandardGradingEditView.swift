@@ -7,7 +7,6 @@ struct StandardGradingEditView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var retailGradeId: Int
-    @State private var gradeId: Int
     @State private var diameterMin: String
     @State private var diameterMax: String
     @State private var beratMin: String
@@ -21,7 +20,6 @@ struct StandardGradingEditView: View {
         self.viewModel = viewModel
 
         _retailGradeId = State(initialValue: rule?.retailGradeId ?? 1)
-        _gradeId = State(initialValue: rule?.gradeId ?? 1)
         _diameterMin = State(initialValue: rule?.diameterMin.map { String($0) } ?? "")
         _diameterMax = State(initialValue: rule?.diameterMaks.map { String($0) } ?? "")
         _beratMin = State(initialValue: rule?.beratMin.map { String($0) } ?? "")
@@ -43,8 +41,7 @@ struct StandardGradingEditView: View {
 
     private var standardName: String {
         let retailName = viewModel.retailGradeNameById[retailGradeId] ?? "Retail"
-        let fruitName = viewModel.gradeNameById[gradeId] ?? "Jeruk Medan"
-        return "\(retailName) - \(fruitName)"
+        return "\(retailName) - Jeruk Medan"
     }
 
     var body: some View {
@@ -176,7 +173,6 @@ struct StandardGradingEditView: View {
         let thresholdRule = ThresholdRule(
             id: rule?.id ?? 0,
             retailGradeId: retailGradeId,
-            gradeId: gradeId,
             diameterMin: diameterMinValue,
             diameterMaks: diameterMaxValue,
             beratMin: beratMinValue,
@@ -208,7 +204,6 @@ struct StandardGradingEditView: View {
         rule: ThresholdRule(
             id: 1,
             retailGradeId: 2,
-            gradeId: 2,
             diameterMin: 6.0,
             diameterMaks: 9.0,
             beratMin: 130.0,

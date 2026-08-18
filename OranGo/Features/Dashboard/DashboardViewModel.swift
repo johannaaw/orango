@@ -6,136 +6,90 @@
 //
 
 import Foundation
-import Observation
 
-@MainActor
 @Observable
+@MainActor
 final class DashboardViewModel {
-    // MARK: - Data Properties
-    var batches: [Batch] = []
-    var machines: [Machine] = []
-    var grades: [Grade] = []
-    var retailGrades: [RetailGrade] = []
-    
-    var isLoading = false
-    var errorMessage: String?
+    private let store: SortingStore
 
-    // MARK: - Repositories
-    private let batchRepository: BatchRepositoryProtocol
-    private let machineRepository: MachineRepositoryProtocol
-    private let gradeRepository: GradeRepositoryProtocol
-    private let retailGradeRepository: RetailGradeRepositoryProtocol
-
-    // MARK: - Computed Properties
-    
-    var machineNameById: [Int: String] {
-        Dictionary(
-            uniqueKeysWithValues: machines.map {
-                ($0.id, $0.machineName)
-            }
-        )
+    init(store: SortingStore) {
+        self.store = store
     }
 
-    var gradeNameById: [Int: String] {
-        Dictionary(
-            uniqueKeysWithValues: grades.map {
-                ($0.id, $0.kelasGrading)
-            }
-        )
+    // MARK: - Data (from the store)
+
+    var summary: DashboardSummary { store.summary }
+    var gradeResults: [GradeResult] { store.gradeResults }
+    var insights: [HarvestInsight] { store.insights }
+    var sortingEntries: [SortingDayEntry] { store.sortingEntries }
+
+    var availableMachines: [SortingMachine] { store.availableMachines }
+    var gradingStandards: [GradingStandard] { store.gradingStandards }
+
+    // MARK: - Screen State
+
+    var selectedDate: Date = .now
+
+    var selectedDateFilter: DateFilter = .daily
+
+    var expandedDayIDs: Set<Date> = []
+
+    var selectedGrade: GradeType?
+
+    var activeRange: DateInterval { store.range }
+
+    func applyRange() {
+        store.setRange(selectedDateFilter.range(endingAt: selectedDate))
     }
 
-    var retailGradeNameById: [Int: String] {
-        Dictionary(
-            uniqueKeysWithValues: retailGrades.map {
-                ($0.id, $0.retailName)
-            }
-        )
+    // MARK: - Derived Summary Values
+
+    private var selectedResult: GradeResult? {
+        guard let selectedGrade else { return nil }
+        return gradeResults.first { $0.gradeType == selectedGrade }
     }
 
-    // MARK: - Init
-
-    init(
-        batchRepository: BatchRepositoryProtocol? = nil,
-        machineRepository: MachineRepositoryProtocol? = nil,
-        gradeRepository: GradeRepositoryProtocol? = nil,
-        retailGradeRepository: RetailGradeRepositoryProtocol? = nil
-    ) {
-        self.batchRepository = batchRepository ?? BatchRepository()
-        self.machineRepository = machineRepository ?? MachineRepository()
-        self.gradeRepository = gradeRepository ?? GradeRepository()
-        self.retailGradeRepository = retailGradeRepository ?? RetailGradeRepository()
+    var displayedWeightKg: Double {
+        selectedResult?.weightKg ?? summary.totalWeightKg
     }
 
-    // MARK: - Fetch Methods
+    var displayedCount: Int {
+        selectedResult?.count ?? summary.totalCount
+    }
 
-    func fetchBatches() async {
-        do {
-            batches = try await batchRepository.fetchBatches()
-        } catch {
-            errorMessage = error.localizedDescription
+    var displayedGradeLabel: String {
+        selectedGrade?.displayName ?? "Semua Grade"
+    }
+
+    // MARK: - Actions
+
+    func selectGrade(_ grade: GradeType) {
+        selectedGrade = (selectedGrade == grade) ? nil : grade
+    }
+
+    func toggleExpansion(for entry: SortingDayEntry) {
+        if expandedDayIDs.contains(entry.id) {
+            expandedDayIDs.remove(entry.id)
+        } else {
+            expandedDayIDs.insert(entry.id)
         }
     }
 
-    func fetchMachines() async {
-        do {
-            machines = try await machineRepository.fetchMachines()
-        } catch {
-            errorMessage = error.localizedDescription
+    func isExpanded(_ entry: SortingDayEntry) -> Bool {
+        expandedDayIDs.contains(entry.id)
+    }
+
+    func startBatch(machine: SortingMachine, standard: GradingStandard) async throws -> String {
+        let batch = try await store.startBatch(machine: machine, standard: standard)
+
+        if let today = store.sortingEntries.first(where: \.isToday) {
+            expandedDayIDs.insert(today.id)
         }
+        return batch.name
     }
 
-    func fetchGrades() async {
-        do {
-            grades = try await gradeRepository.fetchGrades()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    func fetchRetailGrades() async {
-        do {
-            retailGrades = try await retailGradeRepository.fetchRetailGrades()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    // MARK: - Load All Dashboard Data
-
-    func loadDashboardData() async {
-        isLoading = true
-        errorMessage = nil
-
-        await withTaskGroup(of: Void.self) { group in
-            group.addTask {
-                await self.fetchBatches()
-            }
-
-            group.addTask {
-                await self.fetchMachines()
-            }
-
-            group.addTask {
-                await self.fetchGrades()
-            }
-
-            group.addTask {
-                await self.fetchRetailGrades()
-            }
-        }
-
-        isLoading = false
-    }
-
-    // MARK: - Create Methods
-
-    func createBatch(_ batch: Batch) async throws {
-        let createdBatch = try await batchRepository.createBatch(batch)
-        batches.append(createdBatch)
-    }
-
-    func createMachine(_ machine: Machine) async throws {
-        let createdMachine = try await machineRepository.createMachine(machine)
-        machines.append(createdMachine)
+    func fetchData() async {
+        applyRange()
+        await store.load()
     }
 }

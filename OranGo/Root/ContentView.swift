@@ -6,45 +6,77 @@
 //
 import SwiftUI
 
-struct ContentView: View {
-    @State private var selectedPage: Page? = .grading
+// MARK: - Navigation Destination
 
-    enum Page: Hashable {
-        case dashboard
-        case grading
-    }
+enum NavigationDestination: String, CaseIterable, Identifiable {
+    case dashboard = "Dashboard"
+    case standardGrading = "Standar Grading"
 
-    var body: some View {
-        NavigationSplitView {
-            List(selection: $selectedPage) {
-                Section {
-                    Label("Dashboard", systemImage: "chart.bar.fill")
-                        .tag(Page.dashboard)
+    var id: String { rawValue }
 
-                    Label("Standar Grading", systemImage: "slider.vertical.3")
-                        .tag(Page.grading)
-                }
-            }
-            .navigationTitle("OranGo")
-            .navigationSplitViewColumnWidth(min: 220, ideal: 240, max: 280)
-        } detail: {
-            switch selectedPage {
-            case .dashboard:
-                Text("Dashboard ini")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            case .grading:
-                StandardGradingView()
-
-            case nil:
-                Text("Pilih halaman")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
+    var iconName: String {
+        switch self {
+        case .dashboard: return "chart.bar.fill"
+        case .standardGrading: return "slider.horizontal.3"
         }
     }
 }
 
-#Preview("OranGo - iPad Landscape") {
+// MARK: - Content View
+
+struct ContentView: View {
+    @Environment(SortingStore.self) private var store
+    @State private var selectedDestination: NavigationDestination? = .dashboard
+
+    var body: some View {
+        NavigationSplitView {
+            // MARK: Sidebar
+            sidebarList
+                .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 260)
+        } detail: {
+            // MARK: Detail
+            NavigationStack {
+                detailContent
+            }
+        }
+        .navigationSplitViewStyle(.balanced)
+        .tint(Color.orangoBrandOrange)
+    }
+
+    // MARK: - Sidebar
+
+    private var sidebarList: some View {
+        List(selection: $selectedDestination) {
+            ForEach(NavigationDestination.allCases) { destination in
+                Label(destination.rawValue, systemImage: destination.iconName)
+                    .tag(destination)
+            }
+        }
+        .listStyle(.sidebar)
+        .navigationTitle("OranGo")
+    }
+
+    // MARK: - Detail Content
+
+    @ViewBuilder
+    private var detailContent: some View {
+        switch selectedDestination {
+        case .dashboard:
+            DashboardView(store: store)
+        case .standardGrading, .none:
+            Text("Standar Grading")
+                .font(.title2)
+                .foregroundStyle(Color.orangoTextSecondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.orangoPageBackground)
+                .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+}
+
+// MARK: - Preview
+
+#Preview {
     ContentView()
         .previewInterfaceOrientation(.landscapeLeft)
 }

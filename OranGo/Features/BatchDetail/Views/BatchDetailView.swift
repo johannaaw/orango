@@ -65,6 +65,7 @@ struct BatchDetailView: View {
                     isEnabled: !detail.isOngoing
                 )
             }
+            .sharedBackgroundVisibility(.hidden)
         }
         .alert("Standar Grading", isPresented: $isShowingGradingInfo) {
             Button("Tutup", role: .cancel) {}

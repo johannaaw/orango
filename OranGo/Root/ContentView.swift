@@ -50,6 +50,11 @@ struct ContentView: View {
         List(selection: $selectedDestination) {
             ForEach(NavigationDestination.allCases) { destination in
                 Label(destination.rawValue, systemImage: destination.iconName)
+                    .foregroundStyle(
+                        selectedDestination == destination
+                            ? Color.orangoBrandOrange
+                            : Color.orangoTextSecondary
+                    )
                     .tag(destination)
             }
         }

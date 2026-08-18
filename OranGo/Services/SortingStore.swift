@@ -76,8 +76,11 @@ final class SortingStore {
             let (machineDTOs, retailDTOs, batchDTOs, scans) =
                 try await (machinesRequest, retailRequest, batchesRequest, scansRequest)
 
-            machines = machineDTOs.map { SortingMachine(id: $0.id, name: $0.machineName) }
-            gradingStandards = retailDTOs.map { GradingStandard(id: $0.id, name: $0.retailName) }
+            let freshMachines = machineDTOs.map { SortingMachine(id: $0.id, name: $0.machineName) }
+            let freshStandards = retailDTOs.map { GradingStandard(id: $0.id, name: $0.retailName) }
+
+            if freshMachines != machines { machines = freshMachines }
+            if freshStandards != gradingStandards { gradingStandards = freshStandards }
 
             machineDTO = machineDTOs.first
             standardsByID = Dictionary(uniqueKeysWithValues: gradingStandards.map { ($0.id, $0.name) })

@@ -27,7 +27,7 @@ struct OnboardingButton: View {
                 .padding(.vertical, 18)
                 .background(
                     Capsule(style: .continuous)
-                        .fill(isEnabled ? Color.oranGoOrange : Color(.systemGray5))
+                        .fill(isEnabled ? Color.orangoBrandOrange : Color(.systemGray5))
                 )
         }
         .buttonStyle(.plain)

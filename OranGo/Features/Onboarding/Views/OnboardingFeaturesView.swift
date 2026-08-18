@@ -57,7 +57,7 @@ struct OnboardingFeaturesView: View {
                     .font(.system(size: 60, weight: .heavy))
                 Text("OranGo")
                     .font(.system(size: 60, weight: .heavy))
-                    .foregroundStyle(Color.oranGoOrange)
+                    .foregroundStyle(Color.orangoBrandOrange)
             }
             .padding(.bottom, 30)
 
@@ -95,7 +95,7 @@ private struct FeatureRow: View {
                     .font(.system(size: 17, weight: .semibold))
                 Text(feature.description)
                     .font(.system(size: 15))
-                    .foregroundStyle(Color.oranGoSecondaryText)
+                    .foregroundStyle(Color.orangoTextSecondary)
             }
         }
     }

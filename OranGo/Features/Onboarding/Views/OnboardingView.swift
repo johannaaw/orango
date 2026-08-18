@@ -10,7 +10,7 @@
 import SwiftUI
 
 struct OnboardingView: View {
-    @StateObject private var viewModel: OnboardingViewModel
+    @State private var viewModel: OnboardingViewModel
     let onOnboardingFinished: () -> Void
     
     @MainActor
@@ -18,7 +18,7 @@ struct OnboardingView: View {
         viewModel: OnboardingViewModel? = nil,
         onOnboardingFinished: @escaping () -> Void
     ) {
-        _viewModel = StateObject(wrappedValue: viewModel ?? OnboardingViewModel())
+        _viewModel = State(initialValue: viewModel ?? OnboardingViewModel())
         self.onOnboardingFinished = onOnboardingFinished
     }
 
@@ -39,6 +39,7 @@ struct OnboardingView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: viewModel.step)
+        .onDisappear { viewModel.cancelConnection() }
     }
 
     // MARK: - Popup steps (Frames 3-9)

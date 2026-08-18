@@ -54,7 +54,7 @@ private struct HowToUseRow: View {
         HStack(spacing: 20) {
             ZStack {
                 Circle()
-                    .fill(Color.oranGoOrange)
+                    .fill(Color.orangoBrandOrange)
                     .frame(width: 30, height: 30)
                 Text("\(step.id)")
                     .font(.system(size: 15, weight: .bold))

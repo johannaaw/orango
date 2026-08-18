@@ -44,36 +44,23 @@ struct AddBatchSheet: View {
         VStack(alignment: .leading, spacing: 20) {
             header
 
-            field(
+            picker(
                 title: "Mesin Sorting",
                 placeholder: "Pilih mesin untuk sorting",
-                selection: selectedMachine?.name,
-                isEmpty: machines.isEmpty,
-                emptyMessage: "Semua mesin sedang dipakai"
-            ) {
-                ForEach(machines) { machine in
-                    Button(machine.name) { selectedMachine = machine }
-                }
-            }
+                emptyMessage: "Semua mesin sedang dipakai",
+                options: machines,
+                selection: $selectedMachine,
+                label: \.name
+            )
 
-            field(
+            picker(
                 title: "Standar Grading",
                 placeholder: "Pilih standar grading",
-                selection: selectedStandard?.name,
-                isEmpty: gradingStandards.isEmpty,
-                emptyMessage: "Belum ada standar grading"
-            ) {
-                ForEach(gradingStandards) { standard in
-                    Button(standard.name) { selectedStandard = standard }
-                }
-            }
-
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(.caption)
-                    .foregroundStyle(Color.orangoDangerRed)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+                emptyMessage: "Belum ada standar grading",
+                options: gradingStandards,
+                selection: $selectedStandard,
+                label: \.name
+            )
 
             startButton
                 .padding(.top, 8)
@@ -106,50 +93,38 @@ struct AddBatchSheet: View {
         }
     }
 
-    private func field<Options: View>(
+    private func picker<Item: Hashable & Identifiable>(
         title: String,
         placeholder: String,
-        selection: String?,
-        isEmpty: Bool,
         emptyMessage: String,
-        @ViewBuilder options: () -> Options
+        options: [Item],
+        selection: Binding<Item?>,
+        label: KeyPath<Item, String>
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Color.orangoTextPrimary)
 
-            Menu {
-                if isEmpty {
-                    Text(emptyMessage)
-                } else {
-                    options()
-                }
-            } label: {
-                HStack {
-                    Text(selection ?? placeholder)
-                        .font(.subheadline)
-                        .foregroundStyle(selection == nil ? Color.orangoTextSecondary : Color.orangoTextPrimary)
+            Picker(title, selection: selection) {
+                Text(placeholder).tag(Item?.none)
 
-                    Spacer()
-
-                    Image(systemName: "chevron.down")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(Color.orangoTextSecondary)
+                ForEach(options) { option in
+                    Text(option[keyPath: label]).tag(Optional(option))
                 }
-                .padding(.horizontal, 16)
-                .frame(height: 52)
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.orangoRowBackground)
-                )
-                .contentShape(RoundedRectangle(cornerRadius: 10))
             }
-            .disabled(isEmpty)
-            .accessibilityLabel(title)
-            .accessibilityValue(selection ?? "Belum dipilih")
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .disabled(options.isEmpty)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 8)
+            .frame(height: 52)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.orangoRowBackground)
+            )
 
-            if isEmpty {
+            if options.isEmpty {
                 Text(emptyMessage)
                     .font(.caption)
                     .foregroundStyle(Color.orangoTextSecondary)

@@ -29,7 +29,7 @@ struct OnboardingWelcomeView: View {
                     .foregroundStyle(.primary)
                 Text("OranGo")
                     .font(.system(size: 60, weight: .heavy))
-                    .foregroundStyle(Color.oranGoOrange)
+                    .foregroundStyle(Color.orangoBrandOrange)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

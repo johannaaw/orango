@@ -61,7 +61,7 @@ private struct CenterIndicator: View {
 
 #Preview {
     VStack(spacing: 24) {
-        ConnectionIllustrationView(centerSymbol: nil, tint: .oranGoOrange)
+        ConnectionIllustrationView(centerSymbol: nil, tint: .orangoBrandOrange)
         ConnectionIllustrationView(centerSymbol: "magnifyingglass", tint: .yellow)
         ConnectionIllustrationView(centerSymbol: "wifi", tint: .blue)
     }

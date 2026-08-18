@@ -31,10 +31,11 @@ final class SortingStore {
     var lastUpdatedAt: Date?
 
     private let api = OranGoAPI.shared
+    private var refreshTask: Task<Void, Never>?
 
-    private var allBatches: [BatchDTO] = []
-    private var allScans: [HasilSortirDTO] = []
-    private var machineDTO: MachineDTO?
+    private var allBatches: [Batch] = []
+    private var allScans: [HasilSortir] = []
+    private var activeMachine: Machine?
     private var standardsByID: [Int: String] = [:]
 
     private(set) var range: DateInterval = DateFilter.daily.range(endingAt: .now)
@@ -73,15 +74,18 @@ final class SortingStore {
             async let batchesRequest = api.batches()
             async let scansRequest = api.hasilSortir()
 
-            let (machineDTOs, retailDTOs, batchDTOs, scans) =
+            let (machineList, retailList, batchList, scans) =
                 try await (machinesRequest, retailRequest, batchesRequest, scansRequest)
 
-            machines = machineDTOs.map { SortingMachine(id: $0.id, name: $0.machineName) }
-            gradingStandards = retailDTOs.map { GradingStandard(id: $0.id, name: $0.retailName) }
+            let freshMachines = machineList.map { SortingMachine(id: $0.id, name: $0.machineName) }
+            let freshStandards = retailList.map { GradingStandard(id: $0.id, name: $0.retailName) }
 
-            machineDTO = machineDTOs.first
+            if freshMachines != machines { machines = freshMachines }
+            if freshStandards != gradingStandards { gradingStandards = freshStandards }
+
+            activeMachine = machineList.first
             standardsByID = Dictionary(uniqueKeysWithValues: gradingStandards.map { ($0.id, $0.name) })
-            allBatches = batchDTOs
+            allBatches = batchList
             allScans = scans.filter { $0.batch != nil }
 
             recompute()
@@ -91,6 +95,19 @@ final class SortingStore {
             lastError = nil
         } catch {
             lastError = error.localizedDescription
+        }
+    }
+
+    /// One refresher for the whole app, so pushing a detail screen does not double
+    /// the request rate.
+    func startAutoRefresh() {
+        guard refreshTask == nil else { return }
+
+        refreshTask = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.load()
+                try? await Task.sleep(for: .seconds(Date.refreshInterval))
+            }
         }
     }
 
@@ -111,7 +128,7 @@ final class SortingStore {
         sortingEntries = Self.groupIntoDays(batches, scans: scans, standards: standardsByID, range: range)
         gradeResults = Self.aggregateGrades(scans)
         summary = Self.makeSummary(
-            machine: machineDTO,
+            machine: activeMachine,
             scans: scans,
             batches: batches,
             standards: standardsByID,
@@ -142,29 +159,25 @@ final class SortingStore {
 
     func finishBatch(id: Int) async throws {
         _ = try await api.finishBatch(id: id)
-        let scans = try await api.hasilSortir(batchID: id)
-        apply(scans: scans, toBatch: id)
+        await load()
     }
 
     // MARK: - Batch Detail
 
     func detail(for route: BatchDetailRoute) -> BatchDetail {
         let batch = batch(id: route.batchID)
-        let isOngoing = batch?.isOngoing ?? false
+        let scans = allScans.filter { $0.batchId == route.batchID }
 
         return BatchDetail(
             route: route,
-            isOngoing: isOngoing,
-            totalWeightKg: isOngoing ? 0 : (batch?.weightKg ?? 0),
-            totalCount: isOngoing ? 0 : (batchCounts[route.batchID] ?? 0),
+            isOngoing: batch?.isOngoing ?? false,
+            totalWeightKg: scans.reduce(0) { $0 + $1.berat } / Self.gramsPerKilogram,
+            totalCount: scans.count,
             gradingStandard: batch?.gradingStandard ?? summary.gradingStandard,
-            gradeResults: isOngoing ? GradeResult.emptyResults : (batchGrades[route.batchID] ?? gradeResults),
-            insights: isOngoing ? [] : insights
+            gradeResults: Self.aggregateGrades(scans),
+            insights: insights
         )
     }
-
-    private var batchCounts: [Int: Int] = [:]
-    private var batchGrades: [Int: [GradeResult]] = [:]
 
     // MARK: - Mutation Helpers
 
@@ -180,34 +193,11 @@ final class SortingStore {
         }
     }
 
-    private func apply(scans: [HasilSortirDTO], toBatch id: Int) {
-        let weightKg = scans.reduce(0) { $0 + $1.berat } / Self.gramsPerKilogram
-
-        batchCounts[id] = scans.count
-        batchGrades[id] = Self.aggregateGrades(scans)
-
-        for dayIndex in sortingEntries.indices {
-            guard let batchIndex = sortingEntries[dayIndex].batches.firstIndex(where: { $0.id == id })
-            else { continue }
-
-            let batch = sortingEntries[dayIndex].batches[batchIndex]
-            sortingEntries[dayIndex].batches[batchIndex] = BatchEntry(
-                id: batch.id,
-                name: batch.name,
-                weightKg: weightKg,
-                status: .completed,
-                machineID: batch.machineID,
-                gradingStandard: batch.gradingStandard
-            )
-            return
-        }
-    }
-
     // MARK: - Mapping
 
     private static func groupIntoDays(
-        _ batches: [BatchDTO],
-        scans: [HasilSortirDTO],
+        _ batches: [Batch],
+        scans: [HasilSortir],
         standards: [Int: String],
         range: DateInterval
     ) -> [SortingDayEntry] {
@@ -262,7 +252,7 @@ final class SortingStore {
             }
     }
 
-    private static func aggregateGrades(_ scans: [HasilSortirDTO]) -> [GradeResult] {
+    private static func aggregateGrades(_ scans: [HasilSortir]) -> [GradeResult] {
         var weightByGrade: [Int: Double] = [:]
         var countByGrade: [Int: Int] = [:]
 
@@ -285,15 +275,15 @@ final class SortingStore {
     }
 
     private static func makeSummary(
-        machine: MachineDTO?,
-        scans: [HasilSortirDTO],
-        batches: [BatchDTO],
+        machine: Machine?,
+        scans: [HasilSortir],
+        batches: [Batch],
         standards: [Int: String],
         lastUpdatedAt: Date?
     ) -> DashboardSummary {
         return DashboardSummary(
             machineID: machine?.machineName ?? "—",
-            isActive: machine?.statusKoneksi.caseInsensitiveCompare("Terhubung") == .orderedSame,
+            isActive: machine?.isConnected ?? false,
             totalWeightKg: scans.reduce(0) { $0 + $1.berat } / gramsPerKilogram,
             totalCount: scans.count,
             totalBatch: batches.filter { $0.selesaiPada != nil }.count,

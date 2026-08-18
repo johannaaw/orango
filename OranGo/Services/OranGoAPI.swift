@@ -2,7 +2,7 @@
 //  OranGoAPI.swift
 //  OranGo
 //
-//  HTTP client for the OranGo Vapor server.
+//  The app's only HTTP layer. Every call to the OranGo Vapor server goes through here.
 //
 
 import Foundation
@@ -12,24 +12,47 @@ import Foundation
 enum APIConfig {
     static let baseURL = URL(string: "https://orangoserver-production.up.railway.app")!
 
-    static var apiKey: String? = nil
+    /// Required by `POST /api/hasil-sortir`; the device supplies it, the iPad normally does not.
+    static var apiKey: String?
+
+    enum Path {
+        static let machines = "/api/machines"
+        static let grades = "/api/grades"
+        static let batches = "/api/batches"
+        static let retailGrades = "/api/retail-grades"
+        static let thresholdRules = "/api/aturan-threshold"
+        static let hasilSortir = "/api/hasil-sortir"
+    }
 }
 
 // MARK: - Errors
 
 enum APIError: LocalizedError {
-    case badResponse(status: Int, body: String)
-    case decoding(underlying: Error, body: String)
+    case invalidURL(String)
+    case invalidResponse
+    case httpStatus(Int, body: String)
+    case decoding(Error, body: String)
+    case network(Error)
 
     var errorDescription: String? {
         switch self {
-        case .badResponse(let status, let body):
+        case .invalidURL(let path):
+            return "URL API tidak valid: \(path)"
+
+        case .invalidResponse:
+            return "Balasan server tidak dikenali."
+
+        case .httpStatus(let status, let body):
             if let reason = Self.reason(from: body) {
                 return "Server menolak (\(status)): \(reason)"
             }
             return "Server membalas dengan kode \(status)."
+
         case .decoding:
-            return "Format data dari server tidak dikenali."
+            return "Format data dari server tidak sesuai."
+
+        case .network(let error):
+            return error.localizedDescription
         }
     }
 
@@ -42,76 +65,8 @@ enum APIError: LocalizedError {
     }
 }
 
-// MARK: - Wire Models
+// MARK: - Request Bodies
 
-struct Ref: Codable, Hashable {
-    let id: Int
-}
-
-struct MachineDTO: Codable, Hashable {
-    let id: Int
-    let machineName: String
-    let lokasi: String?
-    let statusKoneksi: String
-    let terakhirTerlihat: Date?
-    let thresholdAktif: Ref?
-}
-
-struct GradeDTO: Codable, Hashable {
-    let id: Int
-    let kelasGrading: String
-    let label: String
-    let warnaTampilan: String
-}
-
-struct RetailGradeDTO: Codable, Hashable {
-    let id: Int
-    let retailName: String
-    let dibuatPada: Date?
-    let aktif: Bool
-    let catatan: String?
-}
-
-struct BatchDTO: Codable, Hashable {
-    let id: Int
-    let kodeBatch: String
-    let mulaiPada: Date
-    let selesaiPada: Date?
-    let machine: Ref
-    let retailGrade: Ref
-}
-
-struct HasilSortirDTO: Codable, Hashable {
-    let id: Int
-    let batch: Ref?
-    let grade: Ref
-    let retailGrade: Ref
-    let waktuScan: Date
-    let diameter: Double
-    let berat: Double
-    let warnaOranye: Double
-    let bentukWajar: Bool
-}
-
-// MARK: Aggregates
-
-// TODO: [DB] Kontrak untuk endpoint ringkasan yang belum ada di server.
-struct SortingSummaryDTO: Codable, Hashable {
-    let totalBerat: Double
-    let totalJumlah: Int
-    let totalBatch: Int
-    let perGrade: [GradeSummaryDTO]
-}
-
-struct GradeSummaryDTO: Codable, Hashable {
-    let kelasGrading: String
-    let totalBerat: Double
-    let totalJumlah: Int
-}
-
-// MARK: Requests
-
-// TODO: [DB] kodeBatch disusun server setelah id terbentuk, tidak dikirim dari iPad.
 struct CreateBatchRequest: Codable {
     let machineId: Int
     let retailGradeId: Int
@@ -121,6 +76,16 @@ struct FinishBatchRequest: Codable {
     let selesaiPada: Date
 }
 
+struct CreateRetailGradeRequest: Codable {
+    let retailGrade: RetailGrade
+    let thresholds: [ThresholdRule]
+
+    enum CodingKeys: String, CodingKey {
+        case retailGrade = "retail_grade"
+        case thresholds
+    }
+}
+
 // MARK: - Client
 
 struct OranGoAPI {
@@ -128,87 +93,133 @@ struct OranGoAPI {
 
     private let session: URLSession = .shared
 
-    // MARK: Master Data
+    // MARK: Machines
 
-    func machines() async throws -> [MachineDTO] {
-        try await get("/api/machines")
+    func machines() async throws -> [Machine] {
+        try await get(APIConfig.Path.machines)
     }
 
-    func grades() async throws -> [GradeDTO] {
-        try await get("/api/grades")
+    func createMachine(_ machine: Machine) async throws -> Machine {
+        try await send(APIConfig.Path.machines, method: "POST", body: machine)
     }
 
-    func retailGrades() async throws -> [RetailGradeDTO] {
-        try await get("/api/retail-grades")
+    // MARK: Grades
+
+    func grades() async throws -> [Grade] {
+        try await get(APIConfig.Path.grades)
     }
 
     // MARK: Batches
 
-    func batches() async throws -> [BatchDTO] {
-        try await get("/api/batches")
+    func batches() async throws -> [Batch] {
+        try await get(APIConfig.Path.batches)
     }
 
-    func createBatch(machineID: Int, retailGradeID: Int) async throws -> BatchDTO {
+    /// `kodeBatch` is composed by the server once the row id exists.
+    func createBatch(machineID: Int, retailGradeID: Int) async throws -> Batch {
         try await send(
-            "/api/batches",
+            APIConfig.Path.batches,
             method: "POST",
-            body: CreateBatchRequest(
-                machineId: machineID,
-                retailGradeId: retailGradeID
-            )
+            body: CreateBatchRequest(machineId: machineID, retailGradeId: retailGradeID)
         )
     }
 
     // TODO: [DB] Menunggu PATCH /api/batches/:id ditambahkan di server.
-    func finishBatch(id: Int) async throws -> BatchDTO {
+    func finishBatch(id: Int) async throws -> Batch {
         try await send(
-            "/api/batches/\(id)",
+            "\(APIConfig.Path.batches)/\(id)",
             method: "PATCH",
             body: FinishBatchRequest(selesaiPada: .now)
         )
     }
 
-    // MARK: Results
+    // MARK: Retail Grades
 
-    func hasilSortir(batchID: Int? = nil) async throws -> [HasilSortirDTO] {
-        var path = "/api/hasil-sortir"
-        if let batchID {
-            path += "?batchId=\(batchID)"
-        }
+    func retailGrades() async throws -> [RetailGrade] {
+        try await get(APIConfig.Path.retailGrades)
+    }
+
+    func retailGrade(id: Int) async throws -> RetailGradeDetail {
+        try await get("\(APIConfig.Path.retailGrades)/\(id)")
+    }
+
+    func createRetailGrade(
+        _ retailGrade: RetailGrade,
+        thresholds: [ThresholdRule]
+    ) async throws -> RetailGrade {
+        try await send(
+            APIConfig.Path.retailGrades,
+            method: "POST",
+            body: CreateRetailGradeRequest(retailGrade: retailGrade, thresholds: thresholds)
+        )
+    }
+
+    // TODO: [DB] Endpoint activate belum ada di daftar API server.
+    func activateRetailGrade(id: Int) async throws {
+        try await sendVoid("\(APIConfig.Path.retailGrades)/\(id)/activate", method: "POST")
+    }
+
+    // MARK: Threshold Rules
+
+    func thresholdRules() async throws -> [ThresholdRule] {
+        try await get(APIConfig.Path.thresholdRules)
+    }
+
+    func createThresholdRule(_ rule: ThresholdRule) async throws -> ThresholdRule {
+        try await send(APIConfig.Path.thresholdRules, method: "POST", body: rule)
+    }
+
+    func updateThresholdRule(_ rule: ThresholdRule) async throws -> ThresholdRule {
+        try await send("\(APIConfig.Path.thresholdRules)/\(rule.id)", method: "PATCH", body: rule)
+    }
+
+    func deleteThresholdRule(id: Int) async throws {
+        try await sendVoid("\(APIConfig.Path.thresholdRules)/\(id)", method: "DELETE")
+    }
+
+    // MARK: Hasil Sortir
+
+    func hasilSortir(batchID: Int? = nil) async throws -> [HasilSortir] {
+        var path = APIConfig.Path.hasilSortir
+        if let batchID { path += "?batchId=\(batchID)" }
         return try await get(path)
     }
 
-    // TODO: [DB] Menunggu endpoint ringkasan ditambahkan di server.
-    func summary(from: Date, to: Date) async throws -> SortingSummaryDTO {
-        let formatter = ISO8601DateFormatter()
-        let query = "?from=\(formatter.string(from: from))&to=\(formatter.string(from: to))"
-        return try await get("/api/summary" + query)
-    }
-
-    // TODO: [DB] Menunggu endpoint ringkasan per batch ditambahkan di server.
-    func batchSummary(id: Int) async throws -> SortingSummaryDTO {
-        try await get("/api/batches/\(id)/summary")
+    func createHasilSortir(_ scan: HasilSortir, apiKey: String) async throws -> HasilSortir {
+        try await send(APIConfig.Path.hasilSortir, method: "POST", body: scan, apiKey: apiKey)
     }
 
     // MARK: - Transport
 
     private func get<Response: Decodable>(_ path: String) async throws -> Response {
-        try await perform(request(path, method: "GET"))
+        try await perform(try request(path, method: "GET"))
     }
 
     private func send<Body: Encodable, Response: Decodable>(
         _ path: String,
         method: String,
-        body: Body
+        body: Body,
+        apiKey: String? = nil
     ) async throws -> Response {
-        var urlRequest = request(path, method: method)
+        var urlRequest = try request(path, method: method)
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let apiKey { urlRequest.setValue(apiKey, forHTTPHeaderField: "X-API-Key") }
         urlRequest.httpBody = try Self.encoder.encode(body)
         return try await perform(urlRequest)
     }
 
-    private func request(_ path: String, method: String) -> URLRequest {
-        var urlRequest = URLRequest(url: URL(string: path, relativeTo: APIConfig.baseURL)!)
+    /// For endpoints that answer with no body worth decoding.
+    private func sendVoid(_ path: String, method: String) async throws {
+        var urlRequest = try request(path, method: method)
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        _ = try await performData(urlRequest)
+    }
+
+    private func request(_ path: String, method: String) throws -> URLRequest {
+        guard let url = URL(string: path, relativeTo: APIConfig.baseURL) else {
+            throw APIError.invalidURL(path)
+        }
+        var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = method
         urlRequest.setValue("application/json", forHTTPHeaderField: "Accept")
         if let key = APIConfig.apiKey {
@@ -217,18 +228,32 @@ struct OranGoAPI {
         return urlRequest
     }
 
-    private func perform<Response: Decodable>(_ urlRequest: URLRequest) async throws -> Response {
-        let (data, response) = try await session.data(for: urlRequest)
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+    private func performData(_ urlRequest: URLRequest) async throws -> Data {
+        let data: Data
+        let response: URLResponse
 
-        guard (200 ..< 300).contains(status) else {
-            throw APIError.badResponse(status: status, body: String(decoding: data))
+        do {
+            (data, response) = try await session.data(for: urlRequest)
+        } catch {
+            throw APIError.network(error)
         }
+
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        guard (200 ..< 300).contains(http.statusCode) else {
+            throw APIError.httpStatus(http.statusCode, body: String(decoding: data))
+        }
+        return data
+    }
+
+    private func perform<Response: Decodable>(_ urlRequest: URLRequest) async throws -> Response {
+        let data = try await performData(urlRequest)
 
         do {
             return try Self.decoder.decode(Response.self, from: data)
         } catch {
-            throw APIError.decoding(underlying: error, body: String(decoding: data))
+            throw APIError.decoding(error, body: String(decoding: data))
         }
     }
 

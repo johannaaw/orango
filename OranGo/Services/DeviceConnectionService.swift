@@ -2,43 +2,41 @@
 //  DeviceConnectionService.swift
 //  OranGo
 //
-//  Created by Davin P on 17/08/26.
-//
-
-//  Handles discovery + connection to a physical OranGo sorting device.
-//  This is a placeholder implementation (simulated delays) so the
-//  Onboarding flow is fully functional end-to-end. Replace the bodies of
-//  `discoverDevice()` and `connect(to:)` with real WiFi/BLE/MQTT discovery
-//  logic once that layer is ready.
+//  Finds the sorting machine the Onboarding flow connects to.
 //
 
 import Foundation
 
 protocol DeviceConnectionServicing {
-    /// Looks for a nearby OranGo device on the local network and returns its name.
     func discoverDevice() async throws -> String
-
-    /// Attempts to connect to a previously discovered device.
-    /// Returns `true` on success, `false` on a "graceful" failure (e.g. device didn't respond), throws only for unexpected errors.
     func connect(to deviceName: String) async throws -> Bool
 }
 
-enum DeviceConnectionError: Error {
+enum DeviceConnectionError: LocalizedError {
     case deviceNotFound
-    case connectionTimedOut
+
+    var errorDescription: String? {
+        switch self {
+        case .deviceNotFound:
+            return "Tidak ada mesin sorting yang terdaftar di server."
+        }
+    }
 }
 
 final class DeviceConnectionService: DeviceConnectionServicing {
+    private let api = OranGoAPI.shared
 
     func discoverDevice() async throws -> String {
-        // simulated network discovery delay.
-        try await Task.sleep(nanoseconds: 1_600_000_000)
-        return "OranGo-1312"
+        let machines = try await api.machines()
+        guard let machine = machines.first(where: \.isConnected) ?? machines.first else {
+            throw DeviceConnectionError.deviceNotFound
+        }
+        return machine.machineName
     }
 
+    /// Connection is owned by the machine itself; the app reports what the server says.
     func connect(to deviceName: String) async throws -> Bool {
-        // simulated handshake delay.
-        try await Task.sleep(nanoseconds: 2_000_000_000)
-        return true
+        let machines = try await api.machines()
+        return machines.first { $0.machineName == deviceName }?.isConnected ?? false
     }
 }

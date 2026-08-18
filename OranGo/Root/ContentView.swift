@@ -41,6 +41,7 @@ struct ContentView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .tint(Color.orangoBrandOrange)
+        .task { store.startAutoRefresh() }
     }
 
     // MARK: - Sidebar
@@ -49,6 +50,11 @@ struct ContentView: View {
         List(selection: $selectedDestination) {
             ForEach(NavigationDestination.allCases) { destination in
                 Label(destination.rawValue, systemImage: destination.iconName)
+                    .foregroundStyle(
+                        selectedDestination == destination
+                            ? Color.orangoBrandOrange
+                            : Color.orangoTextSecondary
+                    )
                     .tag(destination)
             }
         }
@@ -64,10 +70,7 @@ struct ContentView: View {
         case .dashboard:
             DashboardView(store: store)
         case .standardGrading, .none:
-            Text("Standar Grading")
-                .font(.title2)
-                .foregroundStyle(Color.orangoTextSecondary)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            StandardGradingView()
                 .background(Color.orangoPageBackground)
                 .navigationBarTitleDisplayMode(.inline)
         }
@@ -78,5 +81,4 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .previewInterfaceOrientation(.landscapeLeft)
 }

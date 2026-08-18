@@ -6,5 +6,9 @@ struct Machine: Codable, Identifiable, Hashable {
     let lokasi: String?
     let statusKoneksi: String?
     let terakhirTerlihat: Date?
-    let thresholdAktifId: Int?
+    let thresholdAktif: Ref?
+
+    var isConnected: Bool {
+        statusKoneksi?.caseInsensitiveCompare("Terhubung") == .orderedSame
+    }
 }

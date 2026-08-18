@@ -17,9 +17,7 @@ final class StandardGradingViewModel {
     var isLoading = false
     var errorMessage: String?
 
-    private let repository: ThresholdRepositoryProtocol
-    private let retailGradeRepository: RetailGradeRepositoryProtocol
-    private let gradeRepository: GradeRepositoryProtocol
+    private let api = OranGoAPI.shared
 
     var retailGradeNameById: [Int: String] {
         Dictionary(
@@ -37,17 +35,11 @@ final class StandardGradingViewModel {
         )
     }
 
-    init(repository: ThresholdRepositoryProtocol? = nil, retailGradeRepository: RetailGradeRepositoryProtocol? = nil, gradeRepository: GradeRepositoryProtocol? = nil) {
-        self.repository = repository ?? ThresholdRepository()
-        self.retailGradeRepository = retailGradeRepository ?? RetailGradeRepository()
-        self.gradeRepository = gradeRepository ?? GradeRepository()
-    }
-
     // MARK: - GET
 
     func fetchThresholdRules() async {
         do {
-            thresholdRules = try await repository.fetchThresholdRules()
+            thresholdRules = try await api.thresholdRules()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -55,7 +47,7 @@ final class StandardGradingViewModel {
 
     func fetchRetailGrades() async {
         do {
-            retailGrades = try await retailGradeRepository.fetchRetailGrades()
+            retailGrades = try await api.retailGrades()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -63,7 +55,7 @@ final class StandardGradingViewModel {
 
     func fetchGrades() async {
         do {
-            grades = try await gradeRepository.fetchGrades()
+            grades = try await api.grades()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -93,7 +85,7 @@ final class StandardGradingViewModel {
     // MARK: - CREATE
 
     func createThresholdRule(_ rule: ThresholdRule) async throws {
-        let createdRule = try await repository.createThresholdRule(rule)
+        let createdRule = try await api.createThresholdRule(rule)
         thresholdRules.append(createdRule)
     }
 
@@ -104,7 +96,7 @@ final class StandardGradingViewModel {
     // MARK: - UPDATE
 
     func updateThresholdRule(_ rule: ThresholdRule) async throws {
-        let updatedRule = try await repository.updateThresholdRule(rule)
+        let updatedRule = try await api.updateThresholdRule(rule)
 
         if let index = thresholdRules.firstIndex(where: { $0.id == updatedRule.id }) {
             thresholdRules[index] = updatedRule
@@ -118,7 +110,7 @@ final class StandardGradingViewModel {
     // MARK: - ACTIVATE RETAIL GRADE
 
     func activateRetailGrade(id: Int) async throws {
-        try await retailGradeRepository.activateRetailGrade(id: id)
+        try await api.activateRetailGrade(id: id)
 
         await fetchRetailGrades()
     }
@@ -126,7 +118,7 @@ final class StandardGradingViewModel {
     // MARK: - DELETE
 
     func deleteThresholdRule(id: Int) async throws {
-        try await repository.deleteThresholdRule(id: id)
+        try await api.deleteThresholdRule(id: id)
         thresholdRules.removeAll { $0.id == id }
     }
 

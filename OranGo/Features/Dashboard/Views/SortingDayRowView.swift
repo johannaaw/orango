@@ -92,10 +92,9 @@ struct SortingDayRowView: View {
             .frame(maxWidth: .infinity)
             .frame(height: 44)
             .background(
-                RoundedRectangle(cornerRadius: SortingTableMetrics.rowCornerRadius)
-                    .stroke(Color.orangoBrandOrange, lineWidth: 1)
+                Capsule().stroke(Color.orangoBrandOrange, lineWidth: 1)
             )
-            .contentShape(RoundedRectangle(cornerRadius: SortingTableMetrics.rowCornerRadius))
+            .contentShape(.capsule)
         }
         .buttonStyle(.plain)
         .padding(.top, 6)

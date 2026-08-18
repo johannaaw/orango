@@ -17,8 +17,6 @@ struct BatchDetailView: View {
     @State private var isShowingEndSorting = false
     @State private var exportFlow = ExportFlowModel()
 
-    private static let ongoingNote = "Proses sorting sedang berlangsung"
-
     private var detail: BatchDetail { store.detail(for: route) }
 
     var body: some View {
@@ -29,22 +27,18 @@ struct BatchDetailView: View {
                     count: displayedCount,
                     gradeLabel: displayedGradeLabel,
                     gradingStandard: detail.gradingStandard,
-                    placeholder: detail.isOngoing ? Self.ongoingNote : nil,
                     onGradingStandardInfo: { isShowingGradingInfo = true }
                 )
 
                 GradeResultsCardView(
                     results: detail.gradeResults,
                     selectedGrade: selectedGrade,
-                    onSelect: detail.isOngoing ? nil : { grade in
+                    onSelect: { grade in
                         withAnimation(.snappy(duration: 0.25)) { selectGrade(grade) }
                     }
                 )
 
-                InsightsPanenView(
-                    insights: detail.insights,
-                    placeholder: detail.isOngoing ? Self.ongoingNote : nil
-                )
+                InsightsPanenView(insights: detail.insights)
 
                 if detail.isOngoing {
                     endSortingButton
@@ -65,6 +59,7 @@ struct BatchDetailView: View {
                     isEnabled: !detail.isOngoing
                 )
             }
+            .sharedBackgroundVisibility(.hidden)
         }
         .alert("Standar Grading", isPresented: $isShowingGradingInfo) {
             Button("Tutup", role: .cancel) {}

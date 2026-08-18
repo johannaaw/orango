@@ -6,10 +6,10 @@
 //
 
 import Foundation
-import Combine
 
 @MainActor
-final class OnboardingViewModel: ObservableObject {
+@Observable
+final class OnboardingViewModel {
 
     // MARK: - Flow step
 
@@ -35,9 +35,9 @@ final class OnboardingViewModel: ObservableObject {
 
     // MARK: - Published state
 
-    @Published private(set) var step: Step = .welcome
-    @Published private(set) var discoveredDeviceName: String?
-    @Published private(set) var isConnecting: Bool = false
+    private(set) var step: Step = .welcome
+    private(set) var discoveredDeviceName: String?
+    private(set) var isConnecting: Bool = false
 
     // MARK: - Dependencies
 
@@ -46,10 +46,6 @@ final class OnboardingViewModel: ObservableObject {
 
     init(deviceService: DeviceConnectionServicing? = nil) {
         self.deviceService = deviceService ?? DeviceConnectionService()
-    }
-
-    deinit {
-        connectionTask?.cancel()
     }
 
     // MARK: - Navigation (called from Views)
@@ -76,6 +72,13 @@ final class OnboardingViewModel: ObservableObject {
     func retryConnection() {
         step = .retrying
         runConnectionFlow(isRetry: true)
+    }
+
+    /// Stops any in-flight connection attempt; called when the flow leaves the screen.
+    func cancelConnection() {
+        connectionTask?.cancel()
+        connectionTask = nil
+        isConnecting = false
     }
 
     /// Frame 7 "Mulai memantau sorting" button. Call this to leave the onboarding flow.

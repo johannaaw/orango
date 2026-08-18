@@ -39,7 +39,7 @@ extension ConnectionStatusView {
         ConnectionStatusView(
             message: "Pastikan Anda berada dalam jaringan Wi-Fi yang sama dengan alat sortir OranGo.",
             centerSymbol: nil,
-            tint: .oranGoOrange
+            tint: .orangoBrandOrange
         )
     }
 

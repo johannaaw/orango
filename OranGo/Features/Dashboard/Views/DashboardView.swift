@@ -85,10 +85,7 @@ struct DashboardView: View {
             Text("Standar grading yang sedang dipakai mesin untuk menentukan grade setiap buah: \(viewModel.summary.gradingStandard).")
         }
         .task {
-            while !Task.isCancelled {
-                await viewModel.fetchData()
-                try? await Task.sleep(for: .seconds(Date.refreshInterval))
-            }
+            viewModel.applyRange()
         }
         .onChange(of: viewModel.selectedDate) {
             viewModel.applyRange()

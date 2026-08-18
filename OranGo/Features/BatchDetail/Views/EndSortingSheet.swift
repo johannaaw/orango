@@ -8,10 +8,12 @@
 import SwiftUI
 
 struct EndSortingSheet: View {
-    let onConfirm: () -> Void
+    let onConfirm: () async throws -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var didFinish = false
+    @State private var isWorking = false
+    @State private var errorMessage: String?
 
     var body: some View {
         Group {
@@ -42,19 +44,33 @@ struct EndSortingSheet: View {
                 .foregroundStyle(Color.orangoTextPrimary)
                 .fixedSize(horizontal: false, vertical: true)
 
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(Color.orangoDangerRed)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             Button {
-                onConfirm()
-                withAnimation(.snappy(duration: 0.2)) { didFinish = true }
+                confirm()
             } label: {
-                Text("Ya, akhiri proses sorting")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .background(Capsule().fill(Color.orangoBrandOrange))
-                    .contentShape(.capsule)
+                Group {
+                    if isWorking {
+                        ProgressView().tint(.white)
+                    } else {
+                        Text("Ya, akhiri proses sorting")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .background(Capsule().fill(Color.orangoBrandOrange))
+                .contentShape(.capsule)
             }
             .buttonStyle(.plain)
+            .disabled(isWorking)
             .padding(.top, 4)
         }
         .padding(24)
@@ -81,6 +97,20 @@ struct EndSortingSheet: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Tutup")
+            }
+        }
+    }
+
+    private func confirm() {
+        isWorking = true
+        errorMessage = nil
+        Task {
+            defer { isWorking = false }
+            do {
+                try await onConfirm()
+                withAnimation(.snappy(duration: 0.2)) { didFinish = true }
+            } catch {
+                errorMessage = "Gagal mengakhiri sorting. \(error.localizedDescription)"
             }
         }
     }

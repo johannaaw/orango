@@ -12,6 +12,26 @@ import Foundation
 enum GradeType: String, CaseIterable {
     case gradeA, gradeB, gradeC, edible, reject
 
+    var serverKey: String {
+        switch self {
+        case .gradeA: return "A"
+        case .gradeB: return "B"
+        case .gradeC: return "C"
+        case .edible: return "EDIBLE"
+        case .reject: return "REJECT"
+        }
+    }
+
+    var serverID: Int {
+        switch self {
+        case .gradeA: return 1
+        case .gradeB: return 2
+        case .gradeC: return 3
+        case .edible: return 4
+        case .reject: return 5
+        }
+    }
+
     var displayName: String {
         switch self {
         case .gradeA: return "Grade A"
@@ -57,36 +77,36 @@ struct GradeResult: Identifiable {
 // MARK: - Sorting Machine
 
 struct SortingMachine: Identifiable, Hashable {
-    let id: String
+    let id: Int
     let name: String
 
     static let samples: [SortingMachine] = [
-        SortingMachine(id: "OranGo-1312", name: "OranGo-1312"),
+        SortingMachine(id: 1, name: "OranGo-1312"),
     ]
 }
 
 // MARK: - Grading Standard
 
 struct GradingStandard: Identifiable, Hashable {
-    let id = UUID()
+    let id: Int
     let name: String
 
     static let samples: [GradingStandard] = [
-        GradingStandard(name: "Superindo - Jeruk Medan"),
-        GradingStandard(name: "Superindo - Jeruk Pontianak"),
-        GradingStandard(name: "Hypermart - Jeruk Medan"),
-        GradingStandard(name: "Pasar Lokal - Campuran"),
+        GradingStandard(id: 1, name: "Superindo - Jeruk Medan"),
+        GradingStandard(id: 2, name: "Superindo - Jeruk Pontianak"),
+        GradingStandard(id: 3, name: "Hypermart - Jeruk Medan"),
+        GradingStandard(id: 4, name: "Pasar Lokal - Campuran"),
     ]
 }
 
 // MARK: - Batch Entry
 
 struct BatchEntry: Identifiable {
-    let id: UUID
+    let id: Int
     let name: String
     let weightKg: Double?
     let status: Status
-    let machineID: String?
+    let machineID: Int?
     let gradingStandard: String?
 
     enum Status {
@@ -95,11 +115,11 @@ struct BatchEntry: Identifiable {
     }
 
     init(
-        id: UUID = UUID(),
+        id: Int,
         name: String,
         weightKg: Double?,
         status: Status = .completed,
-        machineID: String? = nil,
+        machineID: Int? = nil,
         gradingStandard: String? = nil
     ) {
         self.id = id
@@ -116,12 +136,12 @@ struct BatchEntry: Identifiable {
 // MARK: - Sorting Day Entry
 
 struct SortingDayEntry: Identifiable {
-    let id: UUID
     let date: Date
     var batches: [BatchEntry]
 
-    init(id: UUID = UUID(), date: Date, batches: [BatchEntry]) {
-        self.id = id
+    var id: Date { date }
+
+    init(date: Date, batches: [BatchEntry]) {
         self.date = date
         self.batches = batches
     }
@@ -160,17 +180,45 @@ struct DashboardSummary {
     let totalCount: Int
     let totalBatch: Int
     let gradingStandard: String
-    let lastUpdated: String
+    let lastUpdatedAt: Date?
 }
 
 // MARK: - Date Filter
 
 enum DateFilter: String, CaseIterable, Identifiable {
-    case today = "Hari Ini"
-    case thisWeek = "Minggu Ini"
-    case thisMonth = "Bulan Ini"
+    case daily = "Harian"
+    case weekly = "Mingguan"
+    case monthly = "Bulanan"
 
     var id: String { rawValue }
+
+    // MARK: Range
+
+    func range(endingAt date: Date, calendar: Calendar = .current) -> DateInterval {
+        let end = calendar.startOfDay(for: date)
+
+        switch self {
+        case .daily:
+            return DateInterval(start: end, end: end)
+
+        case .weekly:
+            let weekday = calendar.component(.weekday, from: end)
+            let start = calendar.date(byAdding: .day, value: -(weekday - 1), to: end) ?? end
+            return DateInterval(start: start, end: end)
+
+        case .monthly:
+            let components = calendar.dateComponents([.year, .month], from: end)
+            let start = calendar.date(from: components) ?? end
+            return DateInterval(start: start, end: end)
+        }
+    }
+}
+
+extension DateInterval {
+    func containsDay(_ date: Date, calendar: Calendar = .current) -> Bool {
+        let day = calendar.startOfDay(for: date)
+        return day >= start && day <= end
+    }
 }
 
 // MARK: - Sample Data
@@ -184,7 +232,7 @@ extension DashboardSummary {
         totalCount: 1245,
         totalBatch: 2,
         gradingStandard: "Superindo - Jeruk medan",
-        lastUpdated: "30 detik yang lalu"
+        lastUpdatedAt: nil
     )
 }
 
@@ -219,8 +267,15 @@ extension SortingDayEntry {
 
     private static func makeBatches(_ weights: [Double]) -> [BatchEntry] {
         weights.enumerated().map { index, weight in
-            BatchEntry(name: "Batch \(index + 1)", weightKg: weight)
+            BatchEntry(id: Self.nextSampleBatchID(), name: "Batch \(index + 1)", weightKg: weight)
         }
+    }
+
+    private static var sampleBatchCounter = 0
+
+    private static func nextSampleBatchID() -> Int {
+        sampleBatchCounter += 1
+        return sampleBatchCounter
     }
 
     static let sampleEntries: [SortingDayEntry] = [

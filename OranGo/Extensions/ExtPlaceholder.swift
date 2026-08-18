@@ -180,6 +180,41 @@ extension Date {
         Self.indonesianFormatter.string(from: self)
     }
 
+    var formattedDayMonth: String {
+        Self.dayMonthFormatter.string(from: self)
+    }
+
+    var relativeIndonesian: String {
+        let seconds = max(0, Int(Date.now.timeIntervalSince(self)))
+
+        if seconds >= 60 {
+            return "\(seconds / 60) menit yang lalu"
+        }
+
+        let step = (seconds / Date.refreshInterval) * Date.refreshInterval
+        return step <= Date.refreshInterval ? "baru saja" : "\(step) detik yang lalu"
+    }
+
+    static let refreshInterval = 7
+
+    var formattedMonthYear: String {
+        Self.monthYearFormatter.string(from: self)
+    }
+
+    private static let monthYearFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "id_ID")
+        formatter.setLocalizedDateFormatFromTemplate("MMMM yyyy")
+        return formatter
+    }()
+
+    private static let dayMonthFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "id_ID")
+        formatter.setLocalizedDateFormatFromTemplate("d MMM")
+        return formatter
+    }()
+
     private static let indonesianFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "id_ID")
@@ -196,5 +231,26 @@ extension Array {
         return stride(from: 0, to: count, by: size).map {
             Array(self[$0 ..< Swift.min($0 + size, count)])
         }
+    }
+}
+
+extension DateInterval {
+    var formattedIndonesianRange: String {
+        let calendar = Calendar.current
+
+        if calendar.isDate(start, inSameDayAs: end) {
+            return end.formattedIndonesian
+        }
+
+        let from = calendar.dateComponents([.year, .month], from: start)
+        let to = calendar.dateComponents([.year, .month], from: end)
+
+        if from.year == to.year, from.month == to.month {
+            return "\(calendar.component(.day, from: start)) – \(end.formattedIndonesian)"
+        }
+        if from.year == to.year {
+            return "\(start.formattedDayMonth) – \(end.formattedIndonesian)"
+        }
+        return "\(start.formattedIndonesian) – \(end.formattedIndonesian)"
     }
 }

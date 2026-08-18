@@ -30,11 +30,17 @@ final class DashboardViewModel {
 
     var selectedDate: Date = .now
 
-    var selectedDateFilter: DateFilter = .today
+    var selectedDateFilter: DateFilter = .daily
 
-    var expandedDayIDs: Set<UUID> = []
+    var expandedDayIDs: Set<Date> = []
 
     var selectedGrade: GradeType?
+
+    var activeRange: DateInterval { store.range }
+
+    func applyRange() {
+        store.setRange(selectedDateFilter.range(endingAt: selectedDate))
+    }
 
     // MARK: - Derived Summary Values
 
@@ -73,16 +79,17 @@ final class DashboardViewModel {
         expandedDayIDs.contains(entry.id)
     }
 
-    func startBatch(machine: SortingMachine, standard: GradingStandard) -> String? {
-        let batch = store.startBatch(machine: machine, standard: standard)
+    func startBatch(machine: SortingMachine, standard: GradingStandard) async throws -> String {
+        let batch = try await store.startBatch(machine: machine, standard: standard)
 
         if let today = store.sortingEntries.first(where: \.isToday) {
             expandedDayIDs.insert(today.id)
         }
-        return batch?.name
+        return batch.name
     }
 
-    // TODO: [DB] Panggil database di sini, lalu isi properti SortingStore.
     func fetchData() async {
+        applyRange()
+        await store.load()
     }
 }

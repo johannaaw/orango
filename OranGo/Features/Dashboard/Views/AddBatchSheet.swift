@@ -11,13 +11,15 @@ struct AddBatchSheet: View {
     let machines: [SortingMachine]
     let gradingStandards: [GradingStandard]
 
-    let onStart: (SortingMachine, GradingStandard) -> String?
+    let onStart: (SortingMachine, GradingStandard) async throws -> String
 
     @Environment(\.dismiss) private var dismiss
 
     @State private var selectedMachine: SortingMachine?
     @State private var selectedStandard: GradingStandard?
     @State private var startedBatchName: String?
+    @State private var isWorking = false
+    @State private var errorMessage: String?
 
     private var canStart: Bool {
         selectedMachine != nil && selectedStandard != nil
@@ -64,6 +66,13 @@ struct AddBatchSheet: View {
                 ForEach(gradingStandards) { standard in
                     Button(standard.name) { selectedStandard = standard }
                 }
+            }
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(Color.orangoDangerRed)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             startButton
@@ -150,25 +159,42 @@ struct AddBatchSheet: View {
 
     private var startButton: some View {
         Button {
-            guard let selectedMachine, let selectedStandard else { return }
-            let name = onStart(selectedMachine, selectedStandard)
-            withAnimation(.snappy(duration: 0.2)) {
-                startedBatchName = name ?? "baru"
-            }
+            start()
         } label: {
-            Text("Mulai proses sorting")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(canStart ? .white : Color.orangoTextTertiary)
-                .frame(maxWidth: .infinity)
-                .frame(height: 52)
-                .background(
-                    Capsule().fill(canStart ? Color.orangoBrandOrange : Color.orangoRowBackground)
-                )
-                .contentShape(.capsule)
+            Group {
+                if isWorking {
+                    ProgressView().tint(.white)
+                } else {
+                    Text("Mulai proses sorting")
+                        .font(.subheadline.weight(.semibold))
+                }
+            }
+            .foregroundStyle(canStart ? .white : Color.orangoTextTertiary)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background(
+                Capsule().fill(canStart ? Color.orangoBrandOrange : Color.orangoRowBackground)
+            )
+            .contentShape(.capsule)
         }
         .buttonStyle(.plain)
-        .disabled(!canStart)
+        .disabled(!canStart || isWorking)
         .accessibilityHint(canStart ? "" : "Pilih mesin dan standar grading terlebih dahulu")
+    }
+
+    private func start() {
+        guard let selectedMachine, let selectedStandard else { return }
+        isWorking = true
+        errorMessage = nil
+        Task {
+            defer { isWorking = false }
+            do {
+                let name = try await onStart(selectedMachine, selectedStandard)
+                withAnimation(.snappy(duration: 0.2)) { startedBatchName = name }
+            } catch {
+                errorMessage = "Gagal memulai batch. \(error.localizedDescription)"
+            }
+        }
     }
 
     // MARK: - Started Confirmation

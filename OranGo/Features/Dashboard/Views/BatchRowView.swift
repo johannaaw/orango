@@ -62,10 +62,10 @@ struct BatchRowView: View {
 #Preview {
     NavigationStack {
         VStack(spacing: 0) {
-            BatchRowView(batch: BatchEntry(name: "Batch 1", weightKg: 330), date: .now)
-            BatchRowView(batch: BatchEntry(name: "Batch 2", weightKg: 350), date: .now)
+            BatchRowView(batch: BatchEntry(id: 1, name: "Batch 1", weightKg: 330), date: .now)
+            BatchRowView(batch: BatchEntry(id: 2, name: "Batch 2", weightKg: 350), date: .now)
             BatchRowView(
-                batch: BatchEntry(name: "Batch 3", weightKg: nil, status: .ongoing),
+                batch: BatchEntry(id: 3, name: "Batch 3", weightKg: nil, status: .ongoing),
                 date: .now
             )
         }

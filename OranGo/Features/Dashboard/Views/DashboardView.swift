@@ -25,6 +25,7 @@ struct DashboardView: View {
                 DateFilterBarView(
                     selectedDate: $viewModel.selectedDate,
                     selectedFilter: $viewModel.selectedDateFilter,
+                    activeRange: viewModel.activeRange,
                     exportFlow: exportFlow,
                     exportPayload: { exportPayload }
                 )
@@ -65,7 +66,7 @@ struct DashboardView: View {
         }
         .background(Color.orangoPageBackground)
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
-        .toolbar(.hidden, for: .navigationBar)
+        .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(for: BatchDetailRoute.self) { route in
             BatchDetailView(route: route)
         }
@@ -74,9 +75,7 @@ struct DashboardView: View {
                 machines: viewModel.availableMachines,
                 gradingStandards: viewModel.gradingStandards,
                 onStart: { machine, standard in
-                    withAnimation(.snappy(duration: 0.25)) {
-                        viewModel.startBatch(machine: machine, standard: standard)
-                    }
+                    try await viewModel.startBatch(machine: machine, standard: standard)
                 }
             )
         }
@@ -86,13 +85,16 @@ struct DashboardView: View {
             Text("Standar grading yang sedang dipakai mesin untuk menentukan grade setiap buah: \(viewModel.summary.gradingStandard).")
         }
         .task {
-            await viewModel.fetchData()
+            while !Task.isCancelled {
+                await viewModel.fetchData()
+                try? await Task.sleep(for: .seconds(Date.refreshInterval))
+            }
         }
         .onChange(of: viewModel.selectedDate) {
-            Task { await viewModel.fetchData() }
+            viewModel.applyRange()
         }
         .onChange(of: viewModel.selectedDateFilter) {
-            Task { await viewModel.fetchData() }
+            viewModel.applyRange()
         }
     }
 

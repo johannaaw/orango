@@ -96,6 +96,8 @@ struct DonutChartView: View {
         var currentAngle: Double = -90
 
         for result in results {
+            guard result.weightKg > 0 else { continue }
+
             let fraction = result.weightKg / total
             let sweepDegrees = fraction * 360
 
@@ -127,31 +129,35 @@ struct DonutChartView: View {
     @ViewBuilder
     private func segmentLabel(for segment: SegmentInfo, in size: CGFloat, lineWidth: CGFloat) -> some View {
         let radius = (size / 2) - (lineWidth / 2)
-        let x = radius * cos(segment.midAngle.radians)
-        let y = radius * sin(segment.midAngle.radians)
         let glyphSize = lineWidth * 0.46 * segment.gradeType.chartGlyphScale
+        let sweep = abs(segment.endAngle.radians - segment.startAngle.radians)
 
-        Group {
-            if segment.isSymbol {
-                Image(systemName: segment.label)
-                    .font(.system(size: glyphSize, weight: .bold))
-                    .foregroundStyle(segment.appearance.ink)
-                    .shadow(color: segment.appearance.fill, radius: 2)
-                    .shadow(color: segment.appearance.fill, radius: 2)
-            } else {
-                OutlinedGlyph(
-                    string: segment.label,
-                    size: glyphSize,
-                    weight: .black,
-                    fill: segment.appearance.ink,
-                    outline: segment.appearance.inkOutline,
-                    outlineWidth: glyphSize * 0.06
-                )
-                .shadow(color: segment.appearance.fill, radius: outlinedHaloRadius(segment))
-                .shadow(color: segment.appearance.fill, radius: outlinedHaloRadius(segment))
+        if sweep * radius >= glyphSize * 1.35 {
+            Group {
+                if segment.isSymbol {
+                    Image(systemName: segment.label)
+                        .font(.system(size: glyphSize, weight: .bold))
+                        .foregroundStyle(segment.appearance.ink)
+                        .shadow(color: segment.appearance.fill, radius: 2)
+                        .shadow(color: segment.appearance.fill, radius: 2)
+                } else {
+                    OutlinedGlyph(
+                        string: segment.label,
+                        size: glyphSize,
+                        weight: .black,
+                        fill: segment.appearance.ink,
+                        outline: segment.appearance.inkOutline,
+                        outlineWidth: glyphSize * 0.06
+                    )
+                    .shadow(color: segment.appearance.fill, radius: outlinedHaloRadius(segment))
+                    .shadow(color: segment.appearance.fill, radius: outlinedHaloRadius(segment))
+                }
             }
+            .offset(
+                x: radius * cos(segment.midAngle.radians),
+                y: radius * sin(segment.midAngle.radians)
+            )
         }
-        .offset(x: x, y: y)
     }
 }
 

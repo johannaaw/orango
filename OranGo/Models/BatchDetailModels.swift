@@ -10,7 +10,7 @@ import Foundation
 // MARK: - Batch Detail Route
 
 struct BatchDetailRoute: Hashable {
-    let batchID: UUID
+    let batchID: Int
     let batchName: String
     let date: Date
 

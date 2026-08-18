@@ -24,11 +24,24 @@ struct DashboardHeaderView: View {
                 machineBadge
             }
 
-            Text("Terakhir diperbarui: \(summary.lastUpdated)")
+            lastUpdatedLabel
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var lastUpdatedLabel: some View {
+        if let updatedAt = summary.lastUpdatedAt {
+            TimelineView(.periodic(from: .now, by: Double(Date.refreshInterval))) { _ in
+                Text("Terakhir diperbarui: \(updatedAt.relativeIndonesian)")
+                    .font(.footnote)
+                    .foregroundStyle(Color.orangoTextSecondary)
+            }
+        } else {
+            Text("Memuat data…")
                 .font(.footnote)
                 .foregroundStyle(Color.orangoTextSecondary)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var machineBadge: some View {

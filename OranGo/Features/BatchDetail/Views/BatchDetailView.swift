@@ -73,7 +73,7 @@ struct BatchDetailView: View {
         }
         .sheet(isPresented: $isShowingEndSorting) {
             EndSortingSheet {
-                store.finishBatch(id: route.batchID)
+                try await store.finishBatch(id: route.batchID)
             }
         }
     }
@@ -136,7 +136,7 @@ struct BatchDetailView: View {
 #Preview {
     NavigationStack {
         BatchDetailView(
-            route: BatchDetailRoute(batchID: UUID(), batchName: "Batch 1", date: .now)
+            route: BatchDetailRoute(batchID: 1, batchName: "Batch 1", date: .now)
         )
     }
     .environment(SortingStore())

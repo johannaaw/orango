@@ -43,7 +43,7 @@ struct SummaryCardsView: View {
             if let totalBatch {
                 SummaryCardItem(
                     title: "Total Batch",
-                    subtitle: "Semua batch hari ini",
+                    subtitle: "Semua batch periode ini",
                     value: "\(totalBatch)",
                     unit: "batch"
                 )

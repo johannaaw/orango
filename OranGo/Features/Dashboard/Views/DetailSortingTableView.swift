@@ -21,7 +21,7 @@ enum SortingTableMetrics {
 
 struct DetailSortingTableView: View {
     let entries: [SortingDayEntry]
-    let expandedIDs: Set<UUID>
+    let expandedIDs: Set<Date>
     let onToggle: (SortingDayEntry) -> Void
 
     var onAddBatch: (() -> Void)? = nil

@@ -136,7 +136,7 @@ private struct SortingSummaryList: View {
     ScrollView {
         BatchExportDocument(
             detail: .sample(for: BatchDetailRoute(
-                batchID: UUID(),
+                batchID: 1,
                 batchName: "Batch 1",
                 date: .now
             ))

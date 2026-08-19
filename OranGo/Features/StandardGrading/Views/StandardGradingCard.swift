@@ -42,11 +42,23 @@ struct StandardGradingCard: View {
     // MARK: - Header
     
     private var header: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isExpanded.toggle()
+            }
+        } label: {
+            headerContent
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(isExpanded ? "Ketuk untuk menutup detail" : "Ketuk untuk melihat detail")
+    }
+
+    private var headerContent: some View {
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 7)
-                    .fill(Color.green)
-                
+                    .fill(item.isActive ? Color.green : Color.gray.opacity(0.45))
+
                 Image(systemName: "cart.fill")
                     .font(.system(size: 17))
                     .foregroundStyle(.white)
@@ -75,20 +87,14 @@ struct StandardGradingCard: View {
                     .foregroundStyle(.secondary)
             }
             
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isExpanded.toggle()
-                }
-            } label: {
-                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.primary)
-                    .frame(width: 24, height: 24)
-            }
-            .buttonStyle(.borderless)
+            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.primary)
+                .frame(width: 24, height: 24)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
+        .contentShape(.rect)
     }
     
     // MARK: - Expanded Content

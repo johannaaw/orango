@@ -10,6 +10,9 @@ import SwiftUI
 struct DashboardHeaderView: View {
     let summary: DashboardSummary
 
+    /// Why the last fetch failed, so a stalled dashboard does not just look empty.
+    var errorMessage: String? = nil
+
     private var statusText: String {
         summary.isActive ? "Terhubung" : "Tidak Terhubung"
     }
@@ -31,7 +34,12 @@ struct DashboardHeaderView: View {
 
     @ViewBuilder
     private var lastUpdatedLabel: some View {
-        if let updatedAt = summary.lastUpdatedAt {
+        if let errorMessage {
+            Text("Gagal memuat data: \(errorMessage)")
+                .font(.footnote)
+                .foregroundStyle(Color.orangoDangerRed)
+                .fixedSize(horizontal: false, vertical: true)
+        } else if let updatedAt = summary.lastUpdatedAt {
             TimelineView(.periodic(from: .now, by: Double(Date.refreshInterval))) { _ in
                 Text("Terakhir diperbarui: \(updatedAt.relativeIndonesian)")
                     .font(.footnote)

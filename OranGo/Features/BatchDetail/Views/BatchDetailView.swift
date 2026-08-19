@@ -17,10 +17,7 @@ struct BatchDetailView: View {
     @State private var isShowingEndSorting = false
     @State private var exportFlow = ExportFlowModel()
 
-    @State private var insights: [HarvestInsight] = []
-    @State private var insightNotice: String?
-    @State private var isGeneratingInsights = false
-    @State private var lastInsightSnapshot: InsightSnapshot?
+    @State private var insightsModel = InsightsModel()
 
     private var detail: BatchDetail { store.detail(for: route) }
 
@@ -31,7 +28,11 @@ struct BatchDetailView: View {
             totalWeightKg: detail.totalWeightKg,
             totalCount: detail.totalCount,
             totalBatch: 1,
-            gradeResults: detail.gradeResults
+            gradeResults: detail.gradeResults,
+            // A single batch has no earlier equivalent to compare against.
+            comparison: nil,
+            rejectBreakdown: detail.rejectBreakdown,
+            throughputPerHour: detail.throughputPerHour
         )
     }
 
@@ -55,9 +56,9 @@ struct BatchDetailView: View {
                 )
 
                 InsightsPanenView(
-                    insights: insights,
-                    notice: insightNotice,
-                    isLoading: isGeneratingInsights
+                    insights: insightsModel.insights,
+                    notice: insightsModel.notice,
+                    isLoading: insightsModel.isGenerating
                 )
 
                 if detail.isOngoing {
@@ -100,36 +101,7 @@ struct BatchDetailView: View {
     // MARK: - Insights
 
     private func refreshInsightsIfNeeded() async {
-        let snapshot = insightSnapshot
-        guard snapshot != lastInsightSnapshot else { return }
-
-        // 1. CEGAH SPAM: Jangan mulai request baru jika AI masih berfikir (Throttle)
-        // Ini krusial untuk batch yang sedang isOngoing (data masuk tiap detik)
-        guard !isGeneratingInsights else { return }
-
-        // 2. CEGAH ERROR: Jangan tembak AI kalau belum ada buah yang disortir
-        guard snapshot.totalCount > 0 else {
-            self.insights = []
-            self.insightNotice = "Menunggu buah pertama disortir..."
-            return
-        }
-
-        // 3. Kunci State
-        lastInsightSnapshot = snapshot
-        isGeneratingInsights = true
-        
-        defer { isGeneratingInsights = false }
-
-        // 4. Eksekusi
-        let result = await InsightService.insights(for: snapshot)
-        
-        // 5. Update UI
-        self.insights = result.insights
-        if case .computed(let reason) = result.source {
-            self.insightNotice = reason
-        } else {
-            self.insightNotice = nil
-        }
+        await insightsModel.refresh(for: insightSnapshot)
     }
 
     // MARK: - Derived Values
@@ -175,7 +147,7 @@ struct BatchDetailView: View {
             totalCount: self.detail.totalCount,
             gradingStandard: self.detail.gradingStandard,
             gradeResults: self.detail.gradeResults,
-            insights: insights
+            insights: insightsModel.insights
         )
 
         return ExportPayload(

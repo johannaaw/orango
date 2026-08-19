@@ -20,12 +20,14 @@ final class DashboardViewModel {
 
     var summary: DashboardSummary { store.summary }
     var gradeResults: [GradeResult] { store.gradeResults }
-    private(set) var insights: [HarvestInsight] = []
-    private(set) var insightNotice: String?
-    private(set) var isGeneratingInsights = false
-
-    private var lastInsightSnapshot: InsightSnapshot?
     var sortingEntries: [SortingDayEntry] { store.sortingEntries }
+    var loadError: String? { store.lastError }
+
+    private let insightsModel = InsightsModel()
+
+    var insights: [HarvestInsight] { insightsModel.insights }
+    var insightNotice: String? { insightsModel.notice }
+    var isGeneratingInsights: Bool { insightsModel.isGenerating }
 
     var availableMachines: [SortingMachine] { store.availableMachines }
     var gradingStandards: [GradingStandard] { store.gradingStandards }
@@ -54,41 +56,15 @@ final class DashboardViewModel {
             totalWeightKg: summary.totalWeightKg,
             totalCount: summary.totalCount,
             totalBatch: summary.totalBatch,
-            gradeResults: gradeResults
+            gradeResults: gradeResults,
+            comparison: store.comparison,
+            rejectBreakdown: store.rejectBreakdown,
+            throughputPerHour: store.throughputPerHour
         )
     }
 
     func refreshInsightsIfNeeded() async {
-        let snapshot = insightSnapshot
-        guard snapshot != lastInsightSnapshot else { return }
-
-        // 1. CEGAH SPAM: Jangan mulai request baru jika AI masih berfikir (Throttle)
-        // Ini krusial untuk batch yang sedang isOngoing (data masuk tiap detik)
-        guard !isGeneratingInsights else { return }
-
-        // 2. CEGAH ERROR: Jangan tembak AI kalau belum ada buah yang disortir
-        guard snapshot.totalCount > 0 else {
-            self.insights = []
-            self.insightNotice = "Menunggu buah pertama disortir..."
-            return
-        }
-
-        // 3. Kunci State
-        lastInsightSnapshot = snapshot
-        isGeneratingInsights = true
-        
-        defer { isGeneratingInsights = false }
-
-        // 4. Eksekusi
-        let result = await InsightService.insights(for: snapshot)
-        
-        // 5. Update UI
-        self.insights = result.insights
-        if case .computed(let reason) = result.source {
-            self.insightNotice = reason
-        } else {
-            self.insightNotice = nil
-        }
+        await insightsModel.refresh(for: insightSnapshot)
     }
 
     // MARK: - Derived Summary Values
@@ -137,7 +113,9 @@ final class DashboardViewModel {
         return batch.name
     }
 
-    func fetchData() async {
+    /// The store polls on its own; this is for pull-to-refresh, which should not have to
+    /// wait out the interval.
+    func reload() async {
         applyRange()
         await store.load()
     }

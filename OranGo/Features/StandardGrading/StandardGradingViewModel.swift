@@ -11,7 +11,7 @@ import Observation
 @MainActor
 @Observable
 final class StandardGradingViewModel {
-    var thresholdRules: [ThresholdRule] = []
+    /// Thresholds live on the retail grade itself now, so this one list backs the screen.
     var retailGrades: [RetailGrade] = []
     var grades: [Grade] = []
     var isLoading = false
@@ -27,6 +27,18 @@ final class StandardGradingViewModel {
         )
     }
 
+    /// The active standard sits at the top of the list; the rest keep the server's order.
+    var sortedRetailGrades: [RetailGrade] {
+        retailGrades.enumerated()
+            .sorted { lhs, rhs in
+                if lhs.element.isActive != rhs.element.isActive {
+                    return lhs.element.isActive
+                }
+                return lhs.offset < rhs.offset
+            }
+            .map(\.element)
+    }
+
     var gradeNameById: [Int: String] {
         Dictionary(
             uniqueKeysWithValues: grades.map {
@@ -37,20 +49,19 @@ final class StandardGradingViewModel {
 
     // MARK: - GET
 
-    func fetchThresholdRules() async {
-        do {
-            thresholdRules = try await api.thresholdRules()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
     func fetchRetailGrades() async {
         do {
             retailGrades = try await api.retailGrades()
         } catch {
-            errorMessage = error.localizedDescription
+            report(error)
         }
+    }
+
+    /// Leaving the page cancels the `.task` that started the fetch. That is routine, not a
+    /// failure — reporting it is what put "Cancelled / Coba Lagi" on screen when switching pages.
+    private func report(_ error: Error) {
+        guard !error.isCancellation else { return }
+        errorMessage = error.localizedDescription
     }
 
     func refreshRetailGrades() async throws {
@@ -61,7 +72,7 @@ final class StandardGradingViewModel {
         do {
             grades = try await api.grades()
         } catch {
-            errorMessage = error.localizedDescription
+            report(error)
         }
     }
 
@@ -70,10 +81,6 @@ final class StandardGradingViewModel {
         errorMessage = nil
 
         await withTaskGroup(of: Void.self) { group in
-            group.addTask {
-                await self.fetchThresholdRules()
-            }
-
             group.addTask {
                 await self.fetchRetailGrades()
             }
@@ -88,37 +95,31 @@ final class StandardGradingViewModel {
 
     // MARK: - CREATE
 
-    func createThresholdRule(_ rule: ThresholdRule) async throws {
-        let createdRule = try await api.createThresholdRule(rule)
-        thresholdRules.append(createdRule)
+    func createRetailGrade(_ draft: RetailGradeDraft) async throws {
+        let created = try await api.createRetailGrade(draft)
+        retailGrades.append(created)
     }
 
-    func create(_ rule: ThresholdRule) async throws {
-        try await createThresholdRule(rule)
+    func create(_ draft: RetailGradeDraft) async throws {
+        try await createRetailGrade(draft)
     }
 
     // MARK: - UPDATE
 
-    func updateThresholdRule(_ rule: ThresholdRule) async throws {
-        let updatedRule = try await api.updateThresholdRule(rule)
+    func updateRetailGrade(id: Int, draft: RetailGradeDraft) async throws {
+        let updated = try await api.updateRetailGrade(id: id, draft: draft)
 
-        if let index = thresholdRules.firstIndex(where: { $0.id == updatedRule.id }) {
-            thresholdRules[index] = updatedRule
+        if let index = retailGrades.firstIndex(where: { $0.id == updated.id }) {
+            retailGrades[index] = updated
         }
     }
 
-    func update(_ rule: ThresholdRule) async throws {
-        try await updateThresholdRule(rule)
+    func update(id: Int, draft: RetailGradeDraft) async throws {
+        try await updateRetailGrade(id: id, draft: draft)
     }
 
     // MARK: - ACTIVATE RETAIL GRADE
 
-    func activateRetailGrade(id: Int) async throws {
-        try await api.activateRetailGrade(id: id)
-
-        await fetchRetailGrades()
-    }
-    
     func setRetailGradeActive(id: Int, isActive: Bool) async throws {
         let previousRetailGrades = retailGrades
 
@@ -127,9 +128,14 @@ final class StandardGradingViewModel {
             retailGrades[index] = RetailGrade(
                 id: retailGrade.id,
                 retailName: retailGrade.retailName,
-                dibuatPada: retailGrade.dibuatPada,
+                catatan: retailGrade.catatan,
                 aktif: isActive,
-                catatan: retailGrade.catatan
+                dibuatPada: retailGrade.dibuatPada,
+                diameterMin: retailGrade.diameterMin,
+                diameterMaks: retailGrade.diameterMaks,
+                beratMin: retailGrade.beratMin,
+                beratMaks: retailGrade.beratMaks,
+                warnaOranye: retailGrade.warnaOranye
             )
         }
 
@@ -144,16 +150,12 @@ final class StandardGradingViewModel {
 
     // MARK: - DELETE
 
-    func deleteThresholdRule(id: Int) async throws {
-        try await api.deleteThresholdRule(id: id)
-        try await refreshThresholdRules()
-    }
-
-    func refreshThresholdRules() async throws {
-        thresholdRules = try await api.thresholdRules()
+    func deleteRetailGrade(id: Int) async throws {
+        try await api.deleteRetailGrade(id: id)
+        try await refreshRetailGrades()
     }
 
     func delete(id: Int) async throws {
-        try await deleteThresholdRule(id: id)
+        try await deleteRetailGrade(id: id)
     }
 }

@@ -1,12 +1,15 @@
 import SwiftUI
 
 struct StandardGradingEditView: View {
-    let rule: ThresholdRule?
+    let standard: RetailGrade?
     let viewModel: StandardGradingViewModel
-    
+
+    /// Reports the saved name so the list can raise its success toast.
+    var onSaved: (String) -> Void = { _ in }
+
     @Environment(\.dismiss) private var dismiss
-    
-    @State private var retailGradeId: Int
+
+    @State private var retailName: String
     @State private var diameterMin: String
     @State private var diameterMax: String
     @State private var beratMin: String
@@ -14,34 +17,38 @@ struct StandardGradingEditView: View {
     @State private var warnaOranye: String
     @State private var isSaving = false
     @State private var errorMessage: String?
-    
-    init(rule: ThresholdRule?, viewModel: StandardGradingViewModel) {
-        self.rule = rule
+
+    init(
+        standard: RetailGrade?,
+        viewModel: StandardGradingViewModel,
+        onSaved: @escaping (String) -> Void = { _ in }
+    ) {
+        self.standard = standard
         self.viewModel = viewModel
-        
-        _retailGradeId = State(initialValue: rule?.retailGradeId ?? 1)
-        _diameterMin = State(initialValue: rule?.diameterMin.map { String($0) } ?? "")
-        _diameterMax = State(initialValue: rule?.diameterMaks.map { String($0) } ?? "")
-        _beratMin = State(initialValue: rule?.beratMin.map { String($0) } ?? "")
-        _beratMax = State(initialValue: rule?.beratMaks.map { String($0) } ?? "")
-        _warnaOranye = State(initialValue: rule?.warnaOranye.map { String($0) } ?? "")
+        self.onSaved = onSaved
+
+        _retailName = State(initialValue: standard?.retailName ?? "")
+        _diameterMin = State(initialValue: standard?.diameterMin.map { String($0) } ?? "")
+        _diameterMax = State(initialValue: standard?.diameterMaks.map { String($0) } ?? "")
+        _beratMin = State(initialValue: standard?.beratMin.map { String($0) } ?? "")
+        _beratMax = State(initialValue: standard?.beratMaks.map { String($0) } ?? "")
+        _warnaOranye = State(initialValue: standard?.warnaOranye.map { String($0) } ?? "")
     }
-    
+
     private var isEditing: Bool {
-        rule != nil
+        standard != nil
     }
-    
+
     private var title: String {
         isEditing ? "Edit Standar Grading" : "Tambah Standar Grading"
     }
-    
+
     private var saveButtonTitle: String {
         isEditing ? "Simpan" : "Tambah Standar"
     }
-    
-    private var standardName: String {
-        let retailName = viewModel.retailGradeNameById[retailGradeId] ?? "Retail - Jeruk Keprok"
-        return "\(retailName)"
+
+    private var trimmedName: String {
+        retailName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     var body: some View {
@@ -63,9 +70,11 @@ struct StandardGradingEditView: View {
                             .foregroundColor(.primary)
                         
                         HStack {
-                            Text(standardName)
+                            TextField("Superindo - Jeruk Medan", text: $retailName)
                                 .font(.system(size: 15))
                                 .foregroundColor(.primary)
+                                .textInputAutocapitalization(.words)
+                                .autocorrectionDisabled()
                             Spacer()
                         }
                         .padding(.horizontal, 16)
@@ -177,22 +186,12 @@ struct StandardGradingEditView: View {
             }
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationBarTitleDisplayMode(.inline)
+            // The bottom row already pairs Batal with the save button; a second back control
+            // in the toolbar was the duplicate.
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text(title)
                         .font(.system(size: 17, weight: .semibold))
-                }
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: {
-                        dismiss()
-                    }) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.primary)
-                            .frame(width: 40, height: 40)
-                            .background(Color.white)
-                            .clipShape(Circle())
-                    }
                 }
             }
         }
@@ -241,64 +240,51 @@ struct StandardGradingEditView: View {
     }
     
     private func save() async {
-        guard let diameterMinValue = Double(diameterMin),
-              let diameterMaxValue = Double(diameterMax),
-              let beratMinValue = Double(beratMin),
-              let beratMaxValue = Double(beratMax),
-              let warnaOranyeValue = Double(warnaOranye) else {
-            errorMessage = "Pastikan semua nilai sudah valid."
+        let draft: RetailGradeDraft
+
+        do {
+            draft = RetailGradeDraft(
+                retailName: trimmedName,
+                catatan: standard?.catatan,
+                aktif: standard?.isActive ?? false,
+                diameterMin: try RetailGradeDraft.number(diameterMin, field: "Ukuran minimal"),
+                diameterMaks: try RetailGradeDraft.number(diameterMax, field: "Ukuran maksimal"),
+                beratMin: try RetailGradeDraft.number(beratMin, field: "Berat minimal"),
+                beratMaks: try RetailGradeDraft.number(beratMax, field: "Berat maksimal"),
+                warnaOranye: try RetailGradeDraft.number(warnaOranye, field: "Warna oranye minimal")
+            )
+
+            try draft.validate(against: viewModel.retailGrades, excluding: standard?.id)
+        } catch {
+            errorMessage = error.localizedDescription
             return
         }
-        
-        guard diameterMinValue <= diameterMaxValue else {
-            errorMessage = "Ukuran minimal tidak boleh lebih besar dari ukuran maksimal."
-            return
-        }
-        
-        guard beratMinValue <= beratMaxValue else {
-            errorMessage = "Berat minimal tidak boleh lebih besar dari berat maksimal."
-            return
-        }
-        
-        guard warnaOranyeValue >= 0 && warnaOranyeValue <= 100 else {
-            errorMessage = "Warna permukaan harus berada antara 0% dan 100%."
-            return
-        }
-        
-        let thresholdRule = ThresholdRule(
-            id: rule?.id ?? 0,
-            retailGradeId: retailGradeId,
-            diameterMin: diameterMinValue,
-            diameterMaks: diameterMaxValue,
-            beratMin: beratMinValue,
-            beratMaks: beratMaxValue,
-            warnaOranye: warnaOranyeValue
-        )
-        
+
         isSaving = true
         errorMessage = nil
-        
+
         do {
-            if isEditing {
-                try await viewModel.updateThresholdRule(thresholdRule)
+            if let standard {
+                try await viewModel.updateRetailGrade(id: standard.id, draft: draft)
             } else {
-                try await viewModel.createThresholdRule(thresholdRule)
+                try await viewModel.createRetailGrade(draft)
             }
-            
+
+            onSaved(draft.retailName)
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
         }
-        
+
         isSaving = false
     }
 }
 
 #Preview("Edit - Superindo") {
     StandardGradingEditView(
-        rule: ThresholdRule(
+        standard: RetailGrade(
             id: 1,
-            retailGradeId: 2,
+            retailName: "Superindo - Jeruk Medan",
             diameterMin: 6.0,
             diameterMaks: 9.0,
             beratMin: 130.0,
@@ -311,7 +297,7 @@ struct StandardGradingEditView: View {
 
 #Preview("Tambah - Standar Baru") {
     StandardGradingEditView(
-        rule: nil,
+        standard: nil,
         viewModel: StandardGradingViewModel()
     )
 }

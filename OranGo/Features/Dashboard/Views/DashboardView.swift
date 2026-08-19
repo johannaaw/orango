@@ -20,7 +20,10 @@ struct DashboardView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                DashboardHeaderView(summary: viewModel.summary)
+                DashboardHeaderView(
+                    summary: viewModel.summary,
+                    errorMessage: viewModel.loadError
+                )
 
                 DateFilterBarView(
                     selectedDate: $viewModel.selectedDate,
@@ -70,6 +73,7 @@ struct DashboardView: View {
             .padding(.bottom, 24)
         }
         .background(Color.orangoPageBackground)
+        .refreshable { await viewModel.reload() }
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(for: BatchDetailRoute.self) { route in

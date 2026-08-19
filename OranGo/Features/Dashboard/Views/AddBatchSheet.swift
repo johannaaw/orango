@@ -62,6 +62,13 @@ struct AddBatchSheet: View {
                 label: \.name
             )
 
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(Color.orangoDangerRed)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             startButton
                 .padding(.top, 8)
         }

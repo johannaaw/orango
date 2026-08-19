@@ -20,7 +20,6 @@ enum APIConfig {
         static let grades = "/api/grades"
         static let batches = "/api/batches"
         static let retailGrades = "/api/retail-grades"
-        static let thresholdRules = "/api/aturan-threshold"
         static let hasilSortir = "/api/hasil-sortir"
     }
 }
@@ -76,16 +75,6 @@ struct FinishBatchRequest: Codable {
     let selesaiPada: Date
 }
 
-struct CreateRetailGradeRequest: Codable {
-    let retailGrade: RetailGrade
-    let thresholds: [ThresholdRule]
-
-    enum CodingKeys: String, CodingKey {
-        case retailGrade = "retail_grade"
-        case thresholds
-    }
-}
-
 struct UpdateRetailGradeStatusRequest: Codable {
     let aktif: Bool
 }
@@ -138,56 +127,39 @@ struct OranGoAPI {
     }
 
     // MARK: Retail Grades
+    //
+    // A retail grade carries its own thresholds, so these calls are the whole of the
+    // grading-standard API. There is no separate rules endpoint any more.
 
     func retailGrades() async throws -> [RetailGrade] {
         try await get(APIConfig.Path.retailGrades)
     }
 
-    func retailGrade(id: Int) async throws -> RetailGradeDetail {
+    func retailGrade(id: Int) async throws -> RetailGrade {
         try await get("\(APIConfig.Path.retailGrades)/\(id)")
     }
 
-    func createRetailGrade(
-        _ retailGrade: RetailGrade,
-        thresholds: [ThresholdRule]
-    ) async throws -> RetailGrade {
-        try await send(
-            APIConfig.Path.retailGrades,
-            method: "POST",
-            body: CreateRetailGradeRequest(retailGrade: retailGrade, thresholds: thresholds)
-        )
+    func createRetailGrade(_ draft: RetailGradeDraft) async throws -> RetailGrade {
+        try await send(APIConfig.Path.retailGrades, method: "POST", body: draft)
     }
-    
+
+    /// TODO: [DB] The server's PATCH handler currently writes only `aktif`; name, note and
+    /// threshold changes are accepted with a 200 but not persisted. The full body is sent
+    /// here already, so this starts working the moment the handler saves the rest.
+    func updateRetailGrade(id: Int, draft: RetailGradeDraft) async throws -> RetailGrade {
+        try await send("\(APIConfig.Path.retailGrades)/\(id)", method: "PATCH", body: draft)
+    }
+
     func setRetailGradeActive(id: Int, isActive: Bool) async throws {
-        let body = UpdateRetailGradeStatusRequest(aktif: isActive)
         let _: RetailGrade = try await send(
             "\(APIConfig.Path.retailGrades)/\(id)",
             method: "PATCH",
-            body: body
+            body: UpdateRetailGradeStatusRequest(aktif: isActive)
         )
     }
 
-    // TODO: [DB] Endpoint activate belum ada di daftar API server.
-    func activateRetailGrade(id: Int) async throws {
-        try await sendVoid("\(APIConfig.Path.retailGrades)/\(id)/activate", method: "POST")
-    }
-
-    // MARK: Threshold Rules
-
-    func thresholdRules() async throws -> [ThresholdRule] {
-        try await get(APIConfig.Path.thresholdRules)
-    }
-
-    func createThresholdRule(_ rule: ThresholdRule) async throws -> ThresholdRule {
-        try await send(APIConfig.Path.thresholdRules, method: "POST", body: rule)
-    }
-
-    func updateThresholdRule(_ rule: ThresholdRule) async throws -> ThresholdRule {
-        try await send("\(APIConfig.Path.thresholdRules)/\(rule.id)", method: "PATCH", body: rule)
-    }
-
-    func deleteThresholdRule(id: Int) async throws {
-        try await sendVoid("\(APIConfig.Path.thresholdRules)/\(id)", method: "DELETE")
+    func deleteRetailGrade(id: Int) async throws {
+        try await sendVoid("\(APIConfig.Path.retailGrades)/\(id)", method: "DELETE")
     }
 
     // MARK: Hasil Sortir
@@ -288,5 +260,22 @@ struct OranGoAPI {
 private extension String {
     init(decoding data: Data) {
         self = String(data: data, encoding: .utf8) ?? ""
+    }
+}
+
+// MARK: - Cancellation
+
+extension Error {
+    /// True when the request was torn down because its task went away — a view being
+    /// dismissed, a page being switched — rather than because anything went wrong.
+    var isCancellation: Bool {
+        if self is CancellationError { return true }
+
+        if let apiError = self as? APIError, case .network(let underlying) = apiError {
+            return (underlying as NSError).code == NSURLErrorCancelled
+        }
+
+        let nsError = self as NSError
+        return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
     }
 }

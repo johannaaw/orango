@@ -27,6 +27,8 @@ struct ContentView: View {
                         .tag(Page.grading)
                 }
             }
+            // Drives the row selection and hover highlight, which is blue by default.
+            .tint(Color.orangoBrandOrange)
             .navigationTitle("OranGo")
             .navigationSplitViewColumnWidth(
                 min: 220,
@@ -37,7 +39,11 @@ struct ContentView: View {
         } detail: {
             switch selectedPage {
             case .dashboard:
-                DashboardView(store: store)
+                // The detail column of a NavigationSplitView does not supply a stack of its
+                // own, so without this the "Detail" links have nothing to push onto.
+                NavigationStack {
+                    DashboardView(store: store)
+                }
 
             case .grading:
                 StandardGradingView()
@@ -47,6 +53,8 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        // One poller for the whole app, so every screen reads the same live figures.
+        .task { store.startAutoRefresh() }
     }
 }
 

@@ -181,6 +181,16 @@ struct DashboardSummary {
     let totalBatch: Int
     let gradingStandard: String
     let lastUpdatedAt: Date?
+
+    static let empty = DashboardSummary(
+        machineID: "—",
+        isActive: false,
+        totalWeightKg: 0,
+        totalCount: 0,
+        totalBatch: 0,
+        gradingStandard: "—",
+        lastUpdatedAt: nil
+    )
 }
 
 // MARK: - Date Filter

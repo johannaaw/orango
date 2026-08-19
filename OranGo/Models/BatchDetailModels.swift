@@ -29,6 +29,10 @@ struct BatchDetail {
     let gradingStandard: String
     let gradeResults: [GradeResult]
     let insights: [HarvestInsight]
+
+    /// Insight inputs, not shown on the screen itself.
+    var rejectBreakdown: RejectBreakdown? = nil
+    var throughputPerHour: Double? = nil
 }
 
 // MARK: - Sample Data

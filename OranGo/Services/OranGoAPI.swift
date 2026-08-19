@@ -86,6 +86,10 @@ struct CreateRetailGradeRequest: Codable {
     }
 }
 
+struct UpdateRetailGradeStatusRequest: Codable {
+    let aktif: Bool
+}
+
 // MARK: - Client
 
 struct OranGoAPI {
@@ -151,6 +155,15 @@ struct OranGoAPI {
             APIConfig.Path.retailGrades,
             method: "POST",
             body: CreateRetailGradeRequest(retailGrade: retailGrade, thresholds: thresholds)
+        )
+    }
+    
+    func setRetailGradeActive(id: Int, isActive: Bool) async throws {
+        let body = UpdateRetailGradeStatusRequest(aktif: isActive)
+        let _: RetailGrade = try await send(
+            "\(APIConfig.Path.retailGrades)/\(id)",
+            method: "PATCH",
+            body: body
         )
     }
 

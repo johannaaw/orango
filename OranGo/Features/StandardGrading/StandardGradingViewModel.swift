@@ -53,6 +53,10 @@ final class StandardGradingViewModel {
         }
     }
 
+    func refreshRetailGrades() async throws {
+        retailGrades = try await api.retailGrades()
+    }
+
     func fetchGrades() async {
         do {
             grades = try await api.grades()
@@ -114,12 +118,39 @@ final class StandardGradingViewModel {
 
         await fetchRetailGrades()
     }
+    
+    func setRetailGradeActive(id: Int, isActive: Bool) async throws {
+        let previousRetailGrades = retailGrades
+
+        if let index = retailGrades.firstIndex(where: { $0.id == id }) {
+            let retailGrade = retailGrades[index]
+            retailGrades[index] = RetailGrade(
+                id: retailGrade.id,
+                retailName: retailGrade.retailName,
+                dibuatPada: retailGrade.dibuatPada,
+                aktif: isActive,
+                catatan: retailGrade.catatan
+            )
+        }
+
+        do {
+            try await api.setRetailGradeActive(id: id, isActive: isActive)
+            await fetchRetailGrades()
+        } catch {
+            retailGrades = previousRetailGrades
+            throw error
+        }
+    }
 
     // MARK: - DELETE
 
     func deleteThresholdRule(id: Int) async throws {
         try await api.deleteThresholdRule(id: id)
-        thresholdRules.removeAll { $0.id == id }
+        try await refreshThresholdRules()
+    }
+
+    func refreshThresholdRules() async throws {
+        thresholdRules = try await api.thresholdRules()
     }
 
     func delete(id: Int) async throws {

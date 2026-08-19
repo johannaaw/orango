@@ -8,17 +8,31 @@
 import SwiftUI
 
 struct StandardGradingView: View {
+    private enum Sheet: Identifiable {
+        case add
+        case edit(ThresholdRule)
+
+        var id: String {
+            switch self {
+            case .add:
+                return "add"
+            case .edit(let rule):
+                return "edit-\(rule.id)"
+            }
+        }
+    }
+
     @State private var viewModel = StandardGradingViewModel()
-    @State private var selectedRule: ThresholdRule?
-    @State private var showingEditView = false
+    @State private var activeSheet: Sheet?
     @State private var showingAlert = false
     @State private var alertMessage = ""
 
     var body: some View {
-        VStack {
+        VStack(spacing: 0) {
             if viewModel.isLoading && viewModel.thresholdRules.isEmpty {
                 ProgressView("Memuat standar grading...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+
             } else if let error = viewModel.errorMessage {
                 VStack(spacing: 12) {
                     Text(error)
@@ -32,20 +46,43 @@ struct StandardGradingView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding()
+
             } else if viewModel.thresholdRules.isEmpty {
                 emptyState
+
             } else {
                 standardsList
+            }
+
+            // MARK: - Add Button
+            if !viewModel.thresholdRules.isEmpty {
+                Button {
+                    activeSheet = .add
+                } label: {
+                    Label("Tambah Standar Grading", systemImage: "plus")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                }
+                .buttonStyle(.borderedProminent)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
             }
         }
         .task {
             await viewModel.loadAll()
         }
-        .sheet(isPresented: $showingEditView) {
-            StandardGradingEditView(
-                rule: selectedRule,
-                viewModel: viewModel
-            )
+        .sheet(item: $activeSheet, onDismiss: {
+            Task {
+                await viewModel.loadAll()
+            }
+        }) { sheet in
+            switch sheet {
+            case .add:
+                StandardGradingEditView(rule: nil, viewModel: viewModel)
+            case .edit(let rule):
+                StandardGradingEditView(rule: rule, viewModel: viewModel)
+            }
         }
         .alert("Tidak Dapat Dilakukan", isPresented: $showingAlert) {
             Button("OK", role: .cancel) {}
@@ -63,11 +100,11 @@ struct StandardGradingView: View {
 
                 StandardGradingCard(
                     item: item,
-                    onEdit: {
+                    onEdit: { _item in
                         editStandard(rule)
                     },
-                    onActivate: {
-                        activateStandard(rule)
+                    onToggleActive: { isActive in
+                        setActive(rule, isActive: isActive)
                     }
                 )
                 .listRowInsets(EdgeInsets(top: 5, leading: 20, bottom: 5, trailing: 20))
@@ -105,8 +142,7 @@ struct StandardGradingView: View {
                 .foregroundStyle(.secondary)
 
             Button {
-                selectedRule = nil
-                showingEditView = true
+                activeSheet = .add
             } label: {
                 Label("Tambah Standar Grading", systemImage: "plus")
                     .frame(maxWidth: .infinity)
@@ -150,32 +186,63 @@ struct StandardGradingView: View {
             return
         }
 
-        selectedRule = rule
-        showingEditView = true
+        activeSheet = .edit(rule)
     }
 
     // MARK: - Activate
-
-    private func activateStandard(_ rule: ThresholdRule) {
-        let retail = viewModel.retailGrades.first { $0.id == rule.retailGradeId }
-
-        guard let retail else {
-            alertMessage = "Data retail tidak ditemukan."
-            showingAlert = true
-            return
-        }
-
-        guard !(retail.aktif ?? false) else {
+    private func setActive(_ rule: ThresholdRule, isActive: Bool) {
+        if !isActive {
+            Task {
+                await updateActiveState(for: rule.retailGradeId, isActive: false)
+            }
             return
         }
 
         Task {
             do {
-                try await viewModel.activateRetailGrade(id: retail.id)
+                // Validate against the latest server state, not the previous card snapshot.
+                try await viewModel.refreshRetailGrades()
+
+                guard let retail = viewModel.retailGrades.first(where: {
+                    $0.id == rule.retailGradeId
+                }) else {
+                    alertMessage = "Data retail tidak ditemukan."
+                    showingAlert = true
+                    return
+                }
+
+                guard !(retail.aktif ?? false) else {
+                    return
+                }
+
+                let hasOtherActiveStandard = viewModel.retailGrades.contains {
+                    ($0.aktif ?? false) && $0.id != retail.id
+                }
+
+                guard !hasOtherActiveStandard else {
+                    alertMessage = """
+                    Hanya satu standar grading yang dapat aktif pada satu waktu.
+
+                    Nonaktifkan standar yang sedang aktif terlebih dahulu sebelum mengaktifkan standar ini.
+                    """
+                    showingAlert = true
+                    return
+                }
+
+                await updateActiveState(for: retail.id, isActive: true)
             } catch {
                 alertMessage = error.localizedDescription
                 showingAlert = true
             }
+        }
+    }
+
+    private func updateActiveState(for retailGradeId: Int, isActive: Bool) async {
+        do {
+            try await viewModel.setRetailGradeActive(id: retailGradeId, isActive: isActive)
+        } catch {
+            alertMessage = error.localizedDescription
+            showingAlert = true
         }
     }
 
@@ -199,4 +266,8 @@ struct StandardGradingView: View {
             }
         }
     }
+}
+
+#Preview {
+    StandardGradingView()
 }

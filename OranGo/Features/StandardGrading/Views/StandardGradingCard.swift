@@ -21,15 +21,15 @@ struct StandardGradingItem: Identifiable {
 
 struct StandardGradingCard: View {
     let item: StandardGradingItem
-    var onEdit: () -> Void
-    var onActivate: () -> Void
-
+    var onEdit: (StandardGradingItem) -> Void
+    var onToggleActive: (Bool) -> Void
+    
     @State private var isExpanded = false
-
+    
     var body: some View {
         VStack(spacing: 0) {
             header
-
+            
             if isExpanded {
                 expandedContent
             }
@@ -38,29 +38,29 @@ struct StandardGradingCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 13))
         .shadow(color: .black.opacity(0.07), radius: 6, y: 3)
     }
-
+    
     // MARK: - Header
-
+    
     private var header: some View {
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 7)
                     .fill(Color.green)
-
+                
                 Image(systemName: "cart.fill")
                     .font(.system(size: 17))
                     .foregroundStyle(.white)
             }
             .frame(width: 48, height: 48)
-
+            
             VStack(alignment: .leading, spacing: 3) {
                 Text("\(item.retailName)")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.primary)
             }
-
+            
             Spacer()
-
+            
             VStack(alignment: .trailing, spacing: 4) {
                 Text(item.isActive ? "Aktif" : "Tidak Aktif")
                     .font(.system(size: 9, weight: .medium))
@@ -69,12 +69,12 @@ struct StandardGradingCard: View {
                     .padding(.vertical, 4)
                     .background(item.isActive ? Color.green : Color.gray.opacity(0.3))
                     .clipShape(Capsule())
-
+                
                 Text(item.lastUpdated)
                     .font(.system(size: 8))
                     .foregroundStyle(.secondary)
             }
-
+            
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     isExpanded.toggle()
@@ -85,45 +85,45 @@ struct StandardGradingCard: View {
                     .foregroundStyle(.primary)
                     .frame(width: 24, height: 24)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.borderless)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
     }
-
+    
     // MARK: - Expanded Content
-
+    
     private var expandedContent: some View {
         VStack(spacing: 0) {
             Divider()
                 .padding(.horizontal, 14)
-
+            
             HStack(alignment: .top, spacing: 0) {
                 thresholdColumn(
                     title: "Diameter",
                     value: rangeText(min: item.diameterMin, max: item.diameterMax),
                     unit: "cm"
                 )
-
+                
                 thresholdColumn(
                     title: "Berat",
                     value: rangeText(min: item.weightMin, max: item.weightMax),
                     unit: "gr"
                 )
-
+                
                 thresholdColumn(
                     title: "Min. Permukaan Oranye",
                     value: format(item.orangeColorMin),
                     unit: "%"
                 )
-
+                
                 Spacer()
-
+                
                 VStack(spacing: 5) {
                     Text("Aktif")
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
-
+                    
                     Toggle("", isOn: activeBinding)
                         .labelsHidden()
                         .tint(Color.green)
@@ -133,10 +133,11 @@ struct StandardGradingCard: View {
             }
             .padding(.horizontal, 14)
             .padding(.top, 14)
-
+            
             HStack {
                 Button {
-                    onEdit()
+                    onEdit(item)
+                    
                 } label: {
                     Text("Edit")
                         .font(.system(size: 10, weight: .semibold))
@@ -145,10 +146,10 @@ struct StandardGradingCard: View {
                         .background(Color(red: 0.98, green: 0.43, blue: 0.00))
                         .clipShape(Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)
                 .disabled(item.isActive)
                 .opacity(item.isActive ? 0.45 : 1)
-
+                
                 Spacer()
             }
             .padding(.horizontal, 14)
@@ -157,17 +158,17 @@ struct StandardGradingCard: View {
         }
         .transition(.opacity.combined(with: .move(edge: .top)))
     }
-
+    
     // MARK: - Toggle
-
+    
     private var activeBinding: Binding<Bool> {
         Binding(
             get: {
                 item.isActive
             },
             set: { newValue in
-                if newValue && !item.isActive {
-                    onActivate()
+                if newValue != item.isActive {
+                    onToggleActive(newValue)
                 }
             }
         )
@@ -217,7 +218,6 @@ struct StandardGradingCard: View {
 }
 
 // MARK: - Preview
-
 #Preview("Standard Grading Card") {
     ScrollView {
         VStack(spacing: 12) {
@@ -234,10 +234,10 @@ struct StandardGradingCard: View {
                     orangeColorMin: 90,
                     lastUpdated: "30 detik yang lalu"
                 ),
-                onEdit: {
-                    print("Edit Superindo")
+                onEdit: { item in
+                    print("Edit \(item.retailName) dengan ID: \(item.id)")
                 },
-                onActivate: {
+                onToggleActive: {_ in 
                     print("Activate Superindo")
                 }
             )
@@ -255,10 +255,10 @@ struct StandardGradingCard: View {
                     orangeColorMin: 90,
                     lastUpdated: "1 menit yang lalu"
                 ),
-                onEdit: {
-                    print("Edit Ranch Market")
+                onEdit: { item in
+                    print("Edit \(item.retailName) dengan ID: \(item.id)")
                 },
-                onActivate: {
+                onToggleActive: {_ in 
                     print("Activate Ranch Market")
                 }
             )

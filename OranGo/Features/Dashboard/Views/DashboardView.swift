@@ -49,7 +49,11 @@ struct DashboardView: View {
                     onGradingStandardInfo: { isShowingGradingInfo = true }
                 )
 
-                InsightsPanenView(insights: viewModel.insights)
+                InsightsPanenView(
+                    insights: viewModel.insights,
+                    notice: viewModel.insightNotice,
+                    isLoading: viewModel.isGeneratingInsights
+                )
 
                 DetailSortingTableView(
                     entries: viewModel.sortingEntries,
@@ -87,12 +91,16 @@ struct DashboardView: View {
         }
         .task {
             viewModel.applyRange()
+            await viewModel.refreshInsightsIfNeeded()
         }
         .onChange(of: viewModel.selectedDate) {
             viewModel.applyRange()
         }
         .onChange(of: viewModel.selectedDateFilter) {
             viewModel.applyRange()
+        }
+        .onChange(of: viewModel.insightSnapshot) {
+            Task { await viewModel.refreshInsightsIfNeeded() }
         }
     }
 

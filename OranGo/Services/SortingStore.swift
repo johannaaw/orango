@@ -15,7 +15,6 @@ final class SortingStore {
 
     var summary: DashboardSummary = .sample
     var gradeResults: [GradeResult] = GradeResult.sampleResults
-    var insights: [HarvestInsight] = HarvestInsight.sampleInsights
     var sortingEntries: [SortingDayEntry] = SortingDayEntry.sampleEntries
 
     var machines: [SortingMachine] = SortingMachine.samples
@@ -175,7 +174,7 @@ final class SortingStore {
             totalCount: scans.count,
             gradingStandard: batch?.gradingStandard ?? summary.gradingStandard,
             gradeResults: Self.aggregateGrades(scans),
-            insights: insights
+            insights: []
         )
     }
 

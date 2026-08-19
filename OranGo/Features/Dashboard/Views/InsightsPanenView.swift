@@ -10,16 +10,25 @@ import SwiftUI
 struct InsightsPanenView: View {
     let insights: [HarvestInsight]
 
-    var placeholder: String? = nil
+    /// Explains why the on-device model was not used, when that is the case.
+    var notice: String? = nil
+
+    var isLoading: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Insight panen")
-                .font(.headline)
-                .foregroundStyle(Color.orangoTextPrimary)
+            HStack(spacing: 8) {
+                Text("Insight panen")
+                    .font(.headline)
+                    .foregroundStyle(Color.orangoTextPrimary)
 
-            if let placeholder {
-                Text(placeholder)
+                if isLoading {
+                    ProgressView().controlSize(.small)
+                }
+            }
+
+            if insights.isEmpty {
+                Text(isLoading ? "Menyusun insight…" : "Belum ada data untuk dianalisis.")
                     .font(.caption)
                     .foregroundStyle(Color.orangoTextSecondary)
             } else {
@@ -28,6 +37,12 @@ struct InsightsPanenView: View {
                         InsightItemRow(insight: insight)
                     }
                 }
+            }
+
+            if let notice {
+                Text(notice)
+                    .font(.caption2)
+                    .foregroundStyle(Color.orangoTextTertiary)
             }
         }
         .padding(20)

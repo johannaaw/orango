@@ -30,15 +30,6 @@ struct DashboardView: View {
                     exportPayload: { exportPayload }
                 )
 
-                SummaryCardsView(
-                    weightKg: viewModel.displayedWeightKg,
-                    count: viewModel.displayedCount,
-                    gradeLabel: viewModel.displayedGradeLabel,
-                    gradingStandard: viewModel.summary.gradingStandard,
-                    totalBatch: viewModel.summary.totalBatch,
-                    onGradingStandardInfo: { isShowingGradingInfo = true }
-                )
-
                 GradeResultsCardView(
                     results: viewModel.gradeResults,
                     selectedGrade: viewModel.selectedGrade,
@@ -47,6 +38,15 @@ struct DashboardView: View {
                             viewModel.selectGrade(grade)
                         }
                     }
+                )
+                
+                SummaryCardsView(
+                    weightKg: viewModel.displayedWeightKg,
+                    count: viewModel.displayedCount,
+                    gradeLabel: viewModel.displayedGradeLabel,
+                    gradingStandard: viewModel.summary.gradingStandard,
+                    totalBatch: viewModel.summary.totalBatch,
+                    onGradingStandardInfo: { isShowingGradingInfo = true }
                 )
 
                 InsightsPanenView(insights: viewModel.insights)
@@ -62,7 +62,8 @@ struct DashboardView: View {
                     onAddBatch: { isShowingAddBatch = true }
                 )
             }
-            .padding(24)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 24)
         }
         .background(Color.orangoPageBackground)
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)

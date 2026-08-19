@@ -15,7 +15,6 @@ final class ExportFlowModel {
     enum Step: Equatable {
         case chooseFormat
         case confirm(ExportFormat)
-        case saved
     }
 
     var isPresented = false
@@ -23,8 +22,8 @@ final class ExportFlowModel {
     var previewImage: Image?
     var isWriting = false
     var errorMessage: String?
+    var exportedFile: ExportedFile?
 
-    static let savedDismissDelay: Duration = .seconds(1.8)
 
     // MARK: Actions
 
@@ -50,10 +49,11 @@ final class ExportFlowModel {
         Task {
             defer { isWriting = false }
             do {
-                _ = try ExportService.export(payload(), as: format)
-                withAnimation(.snappy(duration: 0.2)) {
-                    step = .saved
-                }
+                let url = try ExportService.export(payload(), as: format)
+                isPresented = false
+                // Let the popover finish closing before the share sheet takes over.
+                try? await Task.sleep(for: .milliseconds(350))
+                exportedFile = ExportedFile(url: url)
             } catch {
                 isPresented = false
                 errorMessage = error.localizedDescription
@@ -95,6 +95,9 @@ struct ExportControl: View {
             popoverContent
                 .presentationCompactAdaptation(.popover)
         }
+        .sheet(item: $model.exportedFile) { file in
+            ShareSheet(url: file.url)
+        }
         .alert("Export gagal", isPresented: errorBinding) {
             Button("Tutup", role: .cancel) { model.errorMessage = nil }
         } message: {
@@ -116,7 +119,6 @@ struct ExportControl: View {
         switch model.step {
         case .chooseFormat: formatPicker
         case .confirm(let format): confirmation(for: format)
-        case .saved: savedConfirmation
         }
     }
 
@@ -212,30 +214,6 @@ struct ExportControl: View {
         .accessibilityHidden(true)
     }
 
-    // MARK: Step 3 — saved
-
-    private var savedConfirmation: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "checkmark.circle")
-                .font(.system(size: 40, weight: .regular))
-                .foregroundStyle(Color.orangoStatusGreen)
-
-            Text("File Tersimpan")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.orangoTextPrimary)
-
-            Text("Tersimpan di Files › OranGo")
-                .font(.caption)
-                .foregroundStyle(Color.orangoTextSecondary)
-        }
-        .padding(24)
-        .frame(width: 260)
-        .accessibilityElement(children: .combine)
-        .task {
-            try? await Task.sleep(for: ExportFlowModel.savedDismissDelay)
-            model.isPresented = false
-        }
-    }
 }
 
 // MARK: - Preview

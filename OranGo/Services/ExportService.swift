@@ -68,6 +68,10 @@ enum ExportService {
 
     static let documentWidth: CGFloat = 900
 
+    /// A4 landscape in points, matching the dashboard's wide, column-based layout.
+    static let pageSize = CGSize(width: 841.8, height: 595.2)
+    static let pageMargin: CGFloat = 28
+
     static func export(_ payload: ExportPayload, as format: ExportFormat) throws -> URL {
         switch format {
         case .pdf: return try writePDF(payload)
@@ -90,18 +94,48 @@ enum ExportService {
         let renderer = ImageRenderer(content: documentBody(payload))
         renderer.scale = 1
 
-        var mediaBox = CGRect(x: 0, y: 0, width: documentWidth, height: 1273)
+        var mediaBox = CGRect(origin: .zero, size: pageSize)
 
         guard let consumer = CGDataConsumer(url: url as CFURL),
               let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else {
             throw ExportError.pdfContextUnavailable
         }
 
+        let contentWidth = pageSize.width - pageMargin * 2
+        let contentHeight = pageSize.height - pageMargin * 2
+
         renderer.render { size, renderInContext in
-            var pageBox = CGRect(origin: .zero, size: size)
-            context.beginPage(mediaBox: &pageBox)
-            renderInContext(context)
-            context.endPage()
+            // The document is laid out at `documentWidth`; shrink it to the page width
+            // and slice the result into page-height bands.
+            let scale = contentWidth / size.width
+            let scaledHeight = size.height * scale
+            let pageCount = max(1, Int(ceil(scaledHeight / contentHeight)))
+
+            for page in 0 ..< pageCount {
+                var pageBox = CGRect(origin: .zero, size: pageSize)
+                context.beginPage(mediaBox: &pageBox)
+                context.saveGState()
+
+                context.clip(to: CGRect(
+                    x: pageMargin,
+                    y: pageMargin,
+                    width: contentWidth,
+                    height: contentHeight
+                ))
+
+                // PDF space is y-up: line the document's top edge up with the top of
+                // the page, then push it down one page-height per sheet.
+                context.translateBy(
+                    x: pageMargin,
+                    y: pageSize.height - pageMargin - scaledHeight + CGFloat(page) * contentHeight
+                )
+                context.scaleBy(x: scale, y: scale)
+
+                renderInContext(context)
+
+                context.restoreGState()
+                context.endPage()
+            }
         }
         context.closePDF()
 
@@ -129,9 +163,12 @@ enum ExportService {
             .background(Color.orangoPageBackground)
     }
 
+    /// Written to the temporary directory: the share sheet copies it wherever the
+    /// user chooses, so the app keeps no duplicate of its own.
     private static func fileURL(baseName: String, ext: String) -> URL {
-        let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        return directory.appendingPathComponent(sanitize(baseName)).appendingPathExtension(ext)
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent(sanitize(baseName))
+            .appendingPathExtension(ext)
     }
 
     private static func sanitize(_ name: String) -> String {

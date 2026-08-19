@@ -108,7 +108,7 @@ struct GradeItemView: View {
                 size: symbolSize,
                 fill: ink,
                 outline: appearance.inkOutline,
-                outlineWidth: symbolSize * 0.09
+                outlineWidth: symbolSize * 0.2
             )
             .shadow(color: appearance.fill, radius: halo)
             .shadow(color: appearance.fill, radius: halo)
@@ -122,7 +122,7 @@ struct GradeItemView: View {
                 weight: .black,
                 fill: ink,
                 outline: appearance.inkOutline,
-                outlineWidth: glyphSize * 0.06
+                outlineWidth: glyphSize * 0.12
             )
             .shadow(color: appearance.fill, radius: halo)
             .shadow(color: appearance.fill, radius: halo)

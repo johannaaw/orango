@@ -22,13 +22,13 @@ extension Color {
 
     // MARK: Grade Palette
 
-    static let orangoGradeBlue = Color(red: 0.16, green: 0.42, blue: 0.85)
+    static let orangoGradeBlue = Color(.blue)
 
-    static let orangoGradeYellow = Color(red: 0.95, green: 0.77, blue: 0.07)
+    static let orangoGradeYellow = Color(.yellow)
 
-    static let orangoGradeAmber = Color(red: 0.94, green: 0.66, blue: 0.20)
+    static let orangoGradeAmber = Color(.orange)
 
-    static let orangoGradeRed = Color(red: 0.90, green: 0.20, blue: 0.16)
+    static let orangoGradeRed = Color(.red)
 
     static let orangoDangerRed = Color(red: 0.80, green: 0.25, blue: 0.25)
 

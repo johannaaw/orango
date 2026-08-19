@@ -147,7 +147,7 @@ struct DonutChartView: View {
                         weight: .black,
                         fill: segment.appearance.ink,
                         outline: segment.appearance.inkOutline,
-                        outlineWidth: glyphSize * 0.06
+                        outlineWidth: glyphSize * 0.12
                     )
                     .shadow(color: segment.appearance.fill, radius: outlinedHaloRadius(segment))
                     .shadow(color: segment.appearance.fill, radius: outlinedHaloRadius(segment))

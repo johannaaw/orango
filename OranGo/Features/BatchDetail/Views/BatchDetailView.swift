@@ -22,20 +22,20 @@ struct BatchDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                SummaryCardsView(
-                    weightKg: displayedWeightKg,
-                    count: displayedCount,
-                    gradeLabel: displayedGradeLabel,
-                    gradingStandard: detail.gradingStandard,
-                    onGradingStandardInfo: { isShowingGradingInfo = true }
-                )
-
                 GradeResultsCardView(
                     results: detail.gradeResults,
                     selectedGrade: selectedGrade,
                     onSelect: { grade in
                         withAnimation(.snappy(duration: 0.25)) { selectGrade(grade) }
                     }
+                )
+
+                SummaryCardsView(
+                    weightKg: displayedWeightKg,
+                    count: displayedCount,
+                    gradeLabel: displayedGradeLabel,
+                    gradingStandard: detail.gradingStandard,
+                    onGradingStandardInfo: { isShowingGradingInfo = true }
                 )
 
                 InsightsPanenView(insights: detail.insights)

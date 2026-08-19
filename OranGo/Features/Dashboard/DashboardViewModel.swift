@@ -28,6 +28,8 @@ final class DashboardViewModel {
     var insights: [HarvestInsight] { insightsModel.insights }
     var insightNotice: String? { insightsModel.notice }
     var isGeneratingInsights: Bool { insightsModel.isGenerating }
+    /// The figures the shown insights were written from, not the newest poll.
+    var insightBasis: InsightSnapshot? { insightsModel.generatedFrom }
 
     var availableMachines: [SortingMachine] { store.availableMachines }
     var gradingStandards: [GradingStandard] { store.gradingStandards }
@@ -59,7 +61,8 @@ final class DashboardViewModel {
             gradeResults: gradeResults,
             comparison: store.comparison,
             rejectBreakdown: store.rejectBreakdown,
-            throughputPerHour: store.throughputPerHour
+            throughputPerHour: store.throughputPerHour,
+            batchQuality: store.batchQuality
         )
     }
 

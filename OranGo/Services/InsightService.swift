@@ -15,9 +15,21 @@ import FoundationModels
 struct InsightComparison: Equatable {
     /// How to name it in the sentence: "kemarin", "minggu sebelumnya", …
     let label: String
+    /// The dates that name covers, so the card can show what it measured against.
+    var periodLabel: String = ""
     let totalWeightKg: Double
     let totalCount: Int
     let rejectPercentage: Double
+    let retailGradePercentage: Double
+    /// Kept so the current pace can be phrased as a percentage rather than a raw rate.
+    var throughputPerHour: Double? = nil
+    /// The earlier period's shortfall mix, so an insight can say which aspect improved.
+    var rejectBreakdown: RejectBreakdown? = nil
+}
+
+/// One batch's outcome inside the period, for comparing batches against each other.
+struct BatchQuality: Equatable {
+    let name: String
     let retailGradePercentage: Double
 }
 
@@ -47,6 +59,15 @@ struct RejectBreakdown: Equatable {
         guard let top = causes.max(by: { $0.1 < $1.1 }), top.1 > 0 else { return nil }
         return top
     }
+
+    /// Counts are held for the arithmetic but never leave this type — everything the insight
+    /// sees is a share of the fruit that missed the standard.
+    func share(of count: Int) -> Double {
+        guard failedCount > 0 else { return 0 }
+        return Double(count) / Double(failedCount) * 100
+    }
+
+    var nearMissShare: Double { share(of: nearMissCount) }
 }
 
 /// The figures an insight can be drawn from.
@@ -61,6 +82,8 @@ struct InsightSnapshot: Equatable {
     var rejectBreakdown: RejectBreakdown? = nil
     /// Fruit per hour across the period, once there is enough of a span to mean anything.
     var throughputPerHour: Double? = nil
+    /// Per-batch outcomes within the period, ordered best first. Only meaningful from two up.
+    var batchQuality: [BatchQuality] = []
 
     var hasData: Bool { totalCount > 0 }
 
@@ -104,8 +127,10 @@ final class InsightsModel {
     private(set) var notice: String?
     private(set) var isGenerating = false
 
-    /// The snapshot the insights on screen were written from.
-    private var generatedFrom: InsightSnapshot?
+    /// The snapshot the insights on screen were written from. Exposed so the card can show
+    /// the figures behind its own percentages — and show the ones actually used, which after
+    /// a poll are no longer the newest ones.
+    private(set) var generatedFrom: InsightSnapshot?
     private var generatedAt: Date?
 
     /// A running batch produces a scan every few seconds. Without a floor, the model would
@@ -160,7 +185,10 @@ final class InsightsModel {
 /// instead of free-form prose we would have to parse.
 @Generable
 private struct GeneratedInsights {
-    @Guide(description: "Three short observations in Indonesian Language, maximal 200 characters", .count(3))
+    @Guide(
+        description: "Between two and four observations about the oranges, in Indonesian, each one sentence under 140 characters",
+        .count(2 ... 4)
+    )
     let items: [String]
 }
 
@@ -227,34 +255,64 @@ enum InsightService {
     private static func generate(_ snapshot: InsightSnapshot) async throws -> [HarvestInsight] {
         let session = LanguageModelSession(
             instructions: """
-            You advise the operator of a citrus sorting line, mid-shift. The operator is
-            already looking at a dashboard showing every grade's weight, count and share.
+            You write a short read-out on a citrus harvest for the packing team. Your subject
+            is ALWAYS the oranges and how this harvest graded — never the sorting equipment.
 
-            Write exactly 3 insights. Each must take a DIFFERENT one of these angles:
-              A. MOVEMENT — what changed against the comparison period, and what it implies.
-              B. CAUSE — which threshold most fruit is failing, and by how much.
-              C. ACTION — one concrete thing to do or check within the next hour.
+            Write between 2 and 4 insights — one for each angle below that the data actually
+            supports, in this order. Skip any angle whose data is missing; never pad with a
+            sentence that only says something could not be compared.
+              1. KECEPATAN — how the sorting pace compares with the comparison period.
+              2. SEBAB — which quality aspect the oranges that missed the standard fell
+                 short on (colour, diameter, weight or shape).
+              3. PERGESERAN SEBAB — which aspect improved or worsened against the comparison
+                 period, e.g. colour shortfalls easing while diameter shortfalls grow.
+              4. ANTAR BATCH — how the strongest and weakest batch of the period differ.
+              5. ARAH KUALITAS — whether the fruit's quality rose OR fell overall; if there
+                 is no comparison period, what share came close enough to be recoverable.
 
             Hard rules:
-            1. Never restate a figure the dashboard already shows on its own. "Grade A
-               mencapai 27%" is forbidden. A percentage may appear ONLY as part of a change
-               ("naik dari 7% ke 11%"), a cause ("72% gagal di warna"), or a recommendation.
-            2. Never praise or grade the result. No "bagus", "sudah baik", "perlu ditinjau"
-               without saying what specifically to do about it.
-            3. Use ONLY the numbers supplied. If the data for an angle is missing, replace it
-               with a second ACTION insight rather than estimating or inventing a trend.
-            4. NEVER write "poin" or "percentage point". Every rate is expressed as a
-               percentage. To describe a change between two rates, state BOTH values —
-               "naik dari 7% ke 11%". For a quantity such as weight, a relative percentage
-               is fine — "volume turun 12%".
-            5. Each sentence strictly under 90 characters.
-            6. Write in Indonesian (Bahasa Indonesia), addressing the operator as "Anda"
-               or with an imperative. Be specific, not encouraging.
+            1. Write about the fruit and the harvest only. NEVER mention the machine, sensor,
+               camera, calibration, threshold settings, the operator's work, or this app.
+            2. NEVER instruct, warn or correct the reader. Forbidden: "periksa", "perhatikan",
+               "pastikan", "tinjau", "sebaiknya", "perlu", "tingkatkan", "cermat". These are
+               observations about the oranges, not tasks for anyone.
+            3. Report the direction the figures actually show. A decline is as reportable as
+               a gain: "reject naik", "kualitas turun", "laju melambat" are all expected when
+               the data says so. NEVER soften, omit or reverse a decline, and never end on a
+               reassurance. What is forbidden is BLAME, not bad news — do not call anything
+               faulty, mis-set or careless, and do not pin a shortfall on the equipment or on
+               anyone's work. A poor harvest is something the fruit shows, and saying so
+               plainly is the job.
+            4. Never restate a figure the dashboard already shows on its own. "Grade A
+               mencapai 27%" is forbidden. A percentage may appear only as part of a change
+               or a cause.
+            5. NEVER write "poin" or "percentage point". To describe a change between two
+               rates, state BOTH values — "naik dari 7% ke 11%".
+            6. EVERY quantity must be a percentage. Never write a count of fruit, a weight in
+               kg, a number of batches, or a rate per hour — no "40 buah", no "390 kg", no
+               "72 buah/jam". Only percentages appear in the data you are given.
+            7. Use ONLY the numbers supplied. If an angle has no data, drop that angle
+               entirely — never estimate, and never invent a trend.
+            8. One sentence per insight, under 140 characters.
+            9. Write in Indonesian (Bahasa Indonesia), in neutral third person about the
+               fruit. Do not address anyone.
 
-            Example of a BAD insight (never write this): "Grade A mendominasi 27,8% dari
-            total berat, kualitas panen tergolong baik."
-            Example of a GOOD insight: "Reject naik dari 7% ke 11% sejak kemarin, hampir
-            semua gagal di warna."
+            BAD, never write these:
+            - "Grade A mendominasi 27,8% dari total berat." (restates the dashboard)
+            - "Perhatikan diameter dengan lebih cermat." (an instruction)
+            - "Proses sorting perlu ditingkatkan." (blames the work)
+            - "Periksa kalibrasi alat." (about the equipment)
+
+            GOOD — note that half of these report a decline, which is exactly right when the
+            figures show one:
+            - "Laju sortir turun 22% sejak kemarin."
+            - "Laju sortir naik 18% sejak kemarin."
+            - "72% jeruk yang belum lolos tertahan di warna kulitnya."
+            - "Kegagalan warna mereda dari 80% ke 62%, sementara diameter naik dari 12% ke 24%."
+            - "Batch B-20260819-004 lolos retail 88%, sedangkan B-20260819-006 hanya 71%."
+            - "Jeruk lolos retail turun dari 84% ke 71% sejak kemarin."
+            - "Reject naik dari 7% ke 15% sejak kemarin."
+            - "20% jeruk yang belum lolos hanya terpaut tipis di warna."
             """
         )
 
@@ -279,59 +337,123 @@ enum InsightService {
     private static func prompt(for snapshot: InsightSnapshot) -> String {
         var sections: [String] = []
 
+        // Every figure below is a percentage. No count, weight or rate is put in front of the
+        // model at all, so there is no absolute number available for it to write.
         // Kept in English so Apple's language detector does not reject the prompt.
         sections.append("""
         PERIOD: \(snapshot.periodLabel)
-        Processed: \(snapshot.totalWeightKg.formattedWeight) kg across \(snapshot.totalCount) fruit, \(snapshot.totalBatch) finished batches.
-        Met retail standard (A/B/C): \(snapshot.retailGradePercentage.formattedWeight)%. Rejected: \(snapshot.rejectPercentage.formattedWeight)%.
+        Met retail standard (A/B/C): \(snapshot.retailGradePercentage.formattedWeight)% of weight.
+        Rejected: \(snapshot.rejectPercentage.formattedWeight)% of weight.
         """)
 
-        // MOVEMENT. Rates are handed over as before/after pairs, never as a difference, so
-        // there is no "points" figure in the prompt for the model to reach for.
+        // 1. KECEPATAN
+        if let previous = snapshot.comparison,
+           let before = previous.throughputPerHour,
+           let now = snapshot.throughputPerHour {
+            sections.append("""
+            1. KECEPATAN vs \(previous.label) (call it "\(previous.label)" in the sentence):
+            - Sorting pace: \(relativeChange(from: before, to: now))
+            - Volume harvested: \(relativeChange(from: previous.totalWeightKg, to: snapshot.totalWeightKg))
+            """)
+        } else if let previous = snapshot.comparison, previous.totalWeightKg > 0 {
+            sections.append("""
+            1. KECEPATAN vs \(previous.label) — pace itself is not comparable this period.
+            Volume harvested: \(relativeChange(from: previous.totalWeightKg, to: snapshot.totalWeightKg))
+            """)
+        }
+
+        // 2. SEBAB — shares of the fruit that missed the standard, never how many.
+        if let breakdown = snapshot.rejectBreakdown, breakdown.failedCount > 0 {
+            let missedShare = snapshot.totalCount > 0
+                ? Double(breakdown.failedCount) / Double(snapshot.totalCount) * 100
+                : 0
+
+            sections.append("""
+            2. SEBAB — \(missedShare.formattedWeight)% of the oranges did not reach standard "\(breakdown.standardName)".
+            Of those oranges, the aspect they fell short on:
+            - colour of the skin: \(breakdown.share(of: breakdown.byColour).formattedWeight)%
+            - diameter: \(breakdown.share(of: breakdown.byDiameter).formattedWeight)%
+            - weight: \(breakdown.share(of: breakdown.byWeight).formattedWeight)%
+            - shape: \(breakdown.share(of: breakdown.byShape).formattedWeight)%
+            Name the largest aspect. This describes the fruit, not any equipment.
+            """)
+        }
+
+        // 3. PERGESERAN SEBAB — only when both periods have an aspect mix to compare.
+        if let now = snapshot.rejectBreakdown,
+           let before = snapshot.comparison?.rejectBreakdown,
+           let label = snapshot.comparison?.label,
+           now.failedCount > 0, before.failedCount > 0 {
+            sections.append("""
+            3. PERGESERAN SEBAB vs \(label) — share of the shortfalling oranges, then and now:
+            - colour: was \(before.share(of: before.byColour).formattedWeight)%, now \(now.share(of: now.byColour).formattedWeight)%
+            - diameter: was \(before.share(of: before.byDiameter).formattedWeight)%, now \(now.share(of: now.byDiameter).formattedWeight)%
+            - weight: was \(before.share(of: before.byWeight).formattedWeight)%, now \(now.share(of: now.byWeight).formattedWeight)%
+            - shape: was \(before.share(of: before.byShape).formattedWeight)%, now \(now.share(of: now.byShape).formattedWeight)%
+            Name only the aspects that moved most. Describe as "dari X% ke Y%".
+            """)
+        }
+
+        // 4. ANTAR BATCH — needs at least two batches worth comparing.
+        if snapshot.batchQuality.count >= 2,
+           let best = snapshot.batchQuality.first,
+           let worst = snapshot.batchQuality.last {
+            sections.append("""
+            4. ANTAR BATCH — oranges reaching retail grade, by batch:
+            - highest: \(best.name) at \(best.retailGradePercentage.formattedWeight)%
+            - lowest: \(worst.name) at \(worst.retailGradePercentage.formattedWeight)%
+            Batch codes are names, not quantities — writing them is fine.
+            """)
+        }
+
+        // 5. ARAH KUALITAS
         if let previous = snapshot.comparison {
             sections.append("""
-            MOVEMENT vs \(previous.label) (call it "\(previous.label)" in the sentence):
-            - Volume: was \(previous.totalWeightKg.formattedWeight) kg, now \(snapshot.totalWeightKg.formattedWeight) kg (\(relativeChange(from: previous.totalWeightKg, to: snapshot.totalWeightKg)))
-            - Fruit count: was \(previous.totalCount), now \(snapshot.totalCount)
-            - Reject rate: was \(previous.rejectPercentage.formattedWeight)%, now \(snapshot.rejectPercentage.formattedWeight)%
-            - Retail-grade rate: was \(previous.retailGradePercentage.formattedWeight)%, now \(snapshot.retailGradePercentage.formattedWeight)%
-            Describe rate changes as "dari X% ke Y%". Do not subtract two rates.
+            5. ARAH KUALITAS vs \(previous.label):
+            - Reaching retail grade: was \(previous.retailGradePercentage.formattedWeight)%, now \(snapshot.retailGradePercentage.formattedWeight)%
+            - Rejected: was \(previous.rejectPercentage.formattedWeight)%, now \(snapshot.rejectPercentage.formattedWeight)%
+            Describe as "dari X% ke Y%". Do not subtract two rates.
             """)
-        } else {
-            sections.append("MOVEMENT: no comparable earlier period. Do not invent a trend.")
-        }
-
-        // CAUSE
-        if let breakdown = snapshot.rejectBreakdown, breakdown.failedCount > 0 {
-            var lines = [
-                "CAUSE — \(breakdown.failedCount) fruit missed standard \"\(breakdown.standardName)\":",
-                "- diameter out of range: \(breakdown.byDiameter)",
-                "- weight out of range: \(breakdown.byWeight)",
-                "- orange colour below threshold: \(breakdown.byColour)",
-                "- irregular shape: \(breakdown.byShape)",
-            ]
-
-            if breakdown.nearMissCount > 0, let cause = breakdown.nearMissCause {
-                lines.append(
-                    "- \(breakdown.nearMissCount) of them failed ONLY on \(cause), and only barely — these are recoverable."
-                )
-            }
-            sections.append(lines.joined(separator: "\n"))
-        } else {
-            sections.append("CAUSE: no per-criterion data available. Do not guess a cause.")
-        }
-
-        // THROUGHPUT, for the ACTION angle
-        if let throughput = snapshot.throughputPerHour {
-            sections.append("THROUGHPUT: \(throughput.formattedWeight) fruit per hour.")
+        } else if let breakdown = snapshot.rejectBreakdown,
+                  breakdown.nearMissCount > 0,
+                  let cause = breakdown.nearMissCause {
+            sections.append("""
+            5. ARAH KUALITAS: no earlier period yet. Instead: \(breakdown.nearMissShare.formattedWeight)% of the
+            oranges that did not reach standard came up short on \(cause) alone, and only barely.
+            """)
         }
 
         sections.append("""
-        TASK: write the 3 insights following the rules — one MOVEMENT, one CAUSE, one ACTION.
-        Do not repeat any grade share on its own.
+        TASK: write one insight for each numbered angle present above — between 2 and 4 in
+        total, in that order. An angle missing above simply does not get an insight; do not
+        mention its absence. Every figure above is a percentage; write percentages only.
+        Describe the oranges. No instructions, no warnings, no mention of equipment.
         """)
 
         return sections.joined(separator: "\n\n")
+    }
+
+    /// The aspect whose share of the shortfall moved furthest between the two periods.
+    private static func largestShift(
+        from before: RejectBreakdown,
+        to now: RejectBreakdown
+    ) -> (aspect: String, before: Double, after: Double)? {
+        let aspects: [(String, Int, Int)] = [
+            ("warna", before.byColour, now.byColour),
+            ("diameter", before.byDiameter, now.byDiameter),
+            ("berat", before.byWeight, now.byWeight),
+            ("bentuk", before.byShape, now.byShape),
+        ]
+
+        let shifts = aspects.map { name, wasCount, nowCount in
+            (aspect: name, before: before.share(of: wasCount), after: now.share(of: nowCount))
+        }
+
+        guard let top = shifts.max(by: { abs($0.after - $0.before) < abs($1.after - $1.before) }),
+              abs(top.after - top.before) >= 1
+        else { return nil }
+
+        return top
     }
 
     /// Relative change of a quantity, which is safe to state as a percentage. Rates are
@@ -364,49 +486,70 @@ enum InsightService {
     private static func computed(_ snapshot: InsightSnapshot) -> [HarvestInsight] {
         var lines: [String] = []
 
-        // MOVEMENT
-        if let previous = snapshot.comparison {
-            let rejectDelta = snapshot.rejectPercentage - previous.rejectPercentage
-
-            if abs(rejectDelta) >= 1 {
-                // Both rates are named, so the sentence carries no ambiguous "points" figure.
-                let direction = rejectDelta > 0 ? "naik" : "turun"
-                lines.append(
-                    "Reject \(direction) dari \(previous.rejectPercentage.formattedWeight)% ke \(snapshot.rejectPercentage.formattedWeight)% sejak \(previous.label)."
-                )
-            } else if previous.totalWeightKg > 0 {
-                let percent = (snapshot.totalWeightKg - previous.totalWeightKg) / previous.totalWeightKg * 100
-                let direction = percent >= 0 ? "naik" : "turun"
-                lines.append(
-                    "Volume \(direction) \(abs(percent).formattedWeight)% sejak \(previous.label), reject stabil."
-                )
-            }
+        // 1. KECEPATAN
+        if let previous = snapshot.comparison,
+           let before = previous.throughputPerHour,
+           let now = snapshot.throughputPerHour,
+           before > 0 {
+            let percent = (now - before) / before * 100
+            lines.append(
+                "Laju sortir \(percent >= 0 ? "naik" : "turun") \(abs(percent).formattedWeight)% sejak \(previous.label)."
+            )
+        } else if let previous = snapshot.comparison, previous.totalWeightKg > 0 {
+            let percent = (snapshot.totalWeightKg - previous.totalWeightKg) / previous.totalWeightKg * 100
+            lines.append(
+                "Jumlah panen tersortir \(percent >= 0 ? "naik" : "turun") \(abs(percent).formattedWeight)% sejak \(previous.label)."
+            )
         }
 
-        // CAUSE
+        // 2. SEBAB
         if let breakdown = snapshot.rejectBreakdown,
            breakdown.failedCount > 0,
            let cause = breakdown.dominantCause {
-            let share = Double(cause.count) / Double(breakdown.failedCount) * 100
-            lines.append("\(share.formattedWeight)% buah gagal di \(cause.name), bukan kriteria lain.")
+            lines.append(
+                "\(breakdown.share(of: cause.count).formattedWeight)% jeruk yang belum lolos tertahan di \(cause.name)."
+            )
         }
 
-        // ACTION
-        if let breakdown = snapshot.rejectBreakdown,
-           breakdown.nearMissCount > 0,
-           let cause = breakdown.nearMissCause {
-            lines.append("\(breakdown.nearMissCount) buah gagal tipis di \(cause) — tinjau ambangnya.")
-        } else if let throughput = snapshot.throughputPerHour {
-            lines.append("Laju \(throughput.formattedWeight) buah/jam; periksa mesin bila melambat.")
-        } else if snapshot.totalBatch > 0 {
-            let perBatch = snapshot.totalWeightKg / Double(snapshot.totalBatch)
-            lines.append("Rata-rata \(perBatch.formattedWeight) kg per batch dari \(snapshot.totalBatch) batch.")
+        // 3. PERGESERAN SEBAB — the aspect that moved most between the two periods.
+        if let now = snapshot.rejectBreakdown,
+           let before = snapshot.comparison?.rejectBreakdown,
+           now.failedCount > 0, before.failedCount > 0,
+           let shift = largestShift(from: before, to: now) {
+            lines.append(
+                "Kegagalan \(shift.aspect) \(shift.after >= shift.before ? "naik" : "mereda") dari \(shift.before.formattedWeight)% ke \(shift.after.formattedWeight)%."
+            )
+        }
+
+        // 4. ANTAR BATCH
+        if snapshot.batchQuality.count >= 2,
+           let best = snapshot.batchQuality.first,
+           let worst = snapshot.batchQuality.last {
+            lines.append(
+                "Batch \(best.name) lolos retail \(best.retailGradePercentage.formattedWeight)%, \(worst.name) \(worst.retailGradePercentage.formattedWeight)%."
+            )
+        }
+
+        // 5. ARAH KUALITAS
+        if let previous = snapshot.comparison {
+            let direction = snapshot.retailGradePercentage >= previous.retailGradePercentage ? "naik" : "turun"
+            lines.append(
+                "Jeruk lolos retail \(direction) dari \(previous.retailGradePercentage.formattedWeight)% ke \(snapshot.retailGradePercentage.formattedWeight)%."
+            )
+        } else if let breakdown = snapshot.rejectBreakdown,
+                  breakdown.nearMissCount > 0,
+                  let cause = breakdown.nearMissCause {
+            lines.append(
+                "\(breakdown.nearMissShare.formattedWeight)% jeruk yang belum lolos hanya terpaut tipis di \(cause)."
+            )
         }
 
         if lines.isEmpty {
-            lines.append("\(snapshot.totalCount) buah tersortir; belum cukup data untuk dibandingkan.")
+            lines.append("Belum cukup data panen untuk dibandingkan pada periode ini.")
         }
 
-        return lines.enumerated().map { HarvestInsight(rank: $0.offset + 1, description: $0.element) }
+        return lines.prefix(4).enumerated().map {
+            HarvestInsight(rank: $0.offset + 1, description: $0.element)
+        }
     }
 }

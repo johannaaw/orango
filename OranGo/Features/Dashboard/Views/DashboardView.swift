@@ -55,7 +55,8 @@ struct DashboardView: View {
                 InsightsPanenView(
                     insights: viewModel.insights,
                     notice: viewModel.insightNotice,
-                    isLoading: viewModel.isGeneratingInsights
+                    isLoading: viewModel.isGeneratingInsights,
+                    basis: viewModel.insightBasis
                 )
 
                 DetailSortingTableView(
@@ -73,6 +74,14 @@ struct DashboardView: View {
             .padding(.bottom, 24)
         }
         .background(Color.orangoPageBackground)
+        // Tapping anywhere clears the grade highlight. Buttons and links resolve their own
+        // taps first, so this only fires on the space between them — and tapping the
+        // highlighted grade again still toggles it off as before.
+        .contentShape(.rect)
+        .onTapGesture {
+            guard viewModel.selectedGrade != nil else { return }
+            withAnimation(.snappy(duration: 0.25)) { viewModel.selectedGrade = nil }
+        }
         .refreshable { await viewModel.reload() }
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .navigationBarTitleDisplayMode(.inline)

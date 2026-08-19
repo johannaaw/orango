@@ -21,7 +21,6 @@ struct OranGoDialog: View {
     let message: String
 
     var confirmTitle: String = "OK"
-    var confirmRole: ButtonRole? = nil
     var cancelTitle: String? = nil
     var onConfirm: () -> Void = {}
 

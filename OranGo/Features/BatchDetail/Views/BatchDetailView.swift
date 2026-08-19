@@ -58,7 +58,9 @@ struct BatchDetailView: View {
                 InsightsPanenView(
                     insights: insightsModel.insights,
                     notice: insightsModel.notice,
-                    isLoading: insightsModel.isGenerating
+                    isLoading: insightsModel.isGenerating,
+                    // A single batch has no earlier equivalent, so the block stays hidden here.
+                    basis: insightsModel.generatedFrom
                 )
 
                 if detail.isOngoing {
@@ -69,6 +71,12 @@ struct BatchDetailView: View {
             .padding(24)
         }
         .background(Color.orangoPageBackground)
+        // Same dismissal as the dashboard: the grade card behaves identically on both screens.
+        .contentShape(.rect)
+        .onTapGesture {
+            guard selectedGrade != nil else { return }
+            withAnimation(.snappy(duration: 0.25)) { selectedGrade = nil }
+        }
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .navigationTitle(route.title)
         .navigationBarTitleDisplayMode(.inline)

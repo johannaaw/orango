@@ -26,6 +26,7 @@ final class SortingStore {
     private(set) var comparison: InsightComparison?
     private(set) var rejectBreakdown: RejectBreakdown?
     private(set) var throughputPerHour: Double?
+    private(set) var batchQuality: [BatchQuality] = []
 
     // MARK: - Loading State
 
@@ -115,6 +116,23 @@ final class SortingStore {
         Set(allBatches.filter { $0.selesaiPada == nil }.map(\.retailGrade.id))
     }
 
+    /// Retail grades any batch points at, finished or not. The server refuses to delete these
+    /// because its batch rows still reference them, so the app must not offer to either —
+    /// blocking only on unfinished batches let the request through and the rejection came
+    /// back as "batch sedang digunakan" when nothing was actually running.
+    var retailGradeIDsWithHistory: Set<Int> {
+        Set(allBatches.map(\.retailGrade.id))
+    }
+
+    /// The batches still pointing at a standard, so the app can say exactly which ones are
+    /// holding it rather than just refusing.
+    func batchCodes(usingRetailGradeID id: Int) -> [String] {
+        allBatches
+            .filter { $0.retailGrade.id == id }
+            .sorted { $0.mulaiPada > $1.mulaiPada }
+            .map(\.kodeBatch)
+    }
+
     /// One refresher for the whole app, so pushing a detail screen does not double
     /// the request rate.
     func startAutoRefresh() {
@@ -147,6 +165,7 @@ final class SortingStore {
         comparison = makeComparison(current: scans)
         rejectBreakdown = Self.makeRejectBreakdown(scans, standard: activeStandard)
         throughputPerHour = Self.makeThroughput(scans)
+        batchQuality = Self.makeBatchQuality(scans, batches: batches)
         summary = Self.makeSummary(
             machine: activeMachine,
             scans: scans,
@@ -205,10 +224,15 @@ final class SortingStore {
 
         return InsightComparison(
             label: label,
+            periodLabel: previousRange.formattedIndonesianRange,
             totalWeightKg: previousScans.reduce(0) { $0 + $1.berat } / Self.gramsPerKilogram,
             totalCount: previousScans.count,
             rejectPercentage: reject,
-            retailGradePercentage: retail
+            retailGradePercentage: retail,
+            // Lets the current pace be stated as a percentage change instead of a raw rate.
+            throughputPerHour: Self.makeThroughput(previousScans),
+            // Lets an insight say which aspect improved, not just that quality moved.
+            rejectBreakdown: Self.makeRejectBreakdown(previousScans, standard: activeStandard)
         )
     }
 
@@ -283,6 +307,30 @@ final class SortingStore {
         if let min, value < min { return min - value }
         if let max, value > max { return value - max }
         return nil
+    }
+
+    /// Retail-grade share per batch, best first. A batch needs enough fruit before its rate
+    /// means anything, so thin ones are left out rather than compared against full ones.
+    static func makeBatchQuality(_ scans: [HasilSortir], batches: [Batch]) -> [BatchQuality] {
+        let namesByID = Dictionary(uniqueKeysWithValues: batches.map { ($0.id, $0.kodeBatch) })
+
+        var scansByBatch: [Int: [HasilSortir]] = [:]
+        for scan in scans {
+            guard let batchID = scan.batch?.id else { continue }
+            scansByBatch[batchID, default: []].append(scan)
+        }
+
+        return scansByBatch
+            .compactMap { batchID, rows -> BatchQuality? in
+                guard rows.count >= 20, let name = namesByID[batchID] else { return nil }
+
+                let retail = aggregateGrades(rows)
+                    .filter { [.gradeA, .gradeB, .gradeC].contains($0.gradeType) }
+                    .reduce(0) { $0 + $1.percentage }
+
+                return BatchQuality(name: name, retailGradePercentage: retail)
+            }
+            .sorted { $0.retailGradePercentage > $1.retailGradePercentage }
     }
 
     static func makeThroughput(_ scans: [HasilSortir]) -> Double? {

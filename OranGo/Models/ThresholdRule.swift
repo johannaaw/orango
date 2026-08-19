@@ -55,10 +55,9 @@ struct ThresholdRule: Codable, Identifiable, Hashable {
         self.beratMaks = try container.decodeIfPresent(Double.self, forKey: .beratMaks)
         self.warnaOranye = try container.decodeIfPresent(Double.self, forKey: .warnaOranye)
         
-        // Extract retailGradeId from nested retailGrade object
-        if let retailGradeContainer = try container.decodeIfPresent([String: Int].self, forKey: .retailGrade),
-           let retailGradeId = retailGradeContainer["id"] {
-            self.retailGradeId = retailGradeId
+        // Extract retailGradeId from the nested relation reference.
+        if let retailGrade = try container.decodeIfPresent(Ref.self, forKey: .retailGrade) {
+            self.retailGradeId = retailGrade.id
         } else {
             self.retailGradeId = 0
         }

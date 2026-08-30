@@ -8,7 +8,7 @@
 ![SwiftUI](https://img.shields.io/badge/SwiftUI-0D1117?style=flat-square&logo=apple&logoColor=white)
 ![Vapor](https://img.shields.io/badge/Vapor-0D1117?style=flat-square&logo=swift&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white)
-![Status](https://img.shields.io/badge/status-in%20progress-yellow?style=flat-square)
+![Status](https://img.shields.io/badge/status-completed-green?style=flat-square)
 
 </div>
 
